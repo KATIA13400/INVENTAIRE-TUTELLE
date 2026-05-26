@@ -171,6 +171,60 @@ td textarea{overflow:hidden;line-height:1.5;min-height:28px}
 </style>
 </head>
 <body>
+
+<!-- ══ ÉCRAN DE CONNEXION ══ -->
+<style>
+#login-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg);z-index:99999;display:flex;align-items:center;justify-content:center;}
+#login-box{background:#fff;border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:90%;max-width:380px;box-shadow:0 8px 40px rgba(122,46,26,0.18);text-align:center;}
+#login-logo{width:82px;height:82px;object-fit:contain;border-radius:50%;margin-bottom:14px;}
+#login-title{font-family:Georgia,'Times New Roman',serif;font-size:19px;font-weight:700;color:var(--tc3);letter-spacing:1.5px;margin-bottom:3px;}
+#login-sub{font-size:11px;color:var(--tc2);letter-spacing:3px;font-family:Georgia,serif;margin-bottom:6px;}
+#login-sep{height:1px;background:var(--tc3);opacity:0.4;margin:10px 0;}
+#login-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px;display:block;}
+#login-input{font-family:inherit;font-size:15px;border:1px solid var(--border);border-radius:8px;padding:10px 14px;background:var(--bg3);color:var(--text);width:100%;box-sizing:border-box;margin-bottom:12px;text-align:center;letter-spacing:4px;}
+#login-input:focus{outline:2px solid var(--tc2);border-color:var(--tc2);}
+#login-btn{background:var(--tc1);color:#fff;border:none;border-radius:8px;padding:11px 0;width:100%;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:.04em;}
+#login-btn:hover{background:var(--tc2);}
+#login-err{font-size:12px;color:#c0392b;margin-top:10px;background:#fdecea;border-radius:6px;padding:7px 12px;display:none;}
+#login-footer{font-size:10px;color:var(--text3);margin-top:16px;}
+</style>
+
+<div id="login-overlay">
+  <div id="login-box">
+    <div id="login-title">M<sup style="font-size:11px;font-family:Georgia,serif">e</sup> FAGIANO Katia</div>
+    <div id="login-sub">SELARLU</div>
+    <div id="login-sep"></div>
+    <label id="login-label" for="login-input">Mot de passe</label>
+    <input type="password" id="login-input" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')checkLogin()" />
+    <button id="login-btn" onclick="checkLogin()">Accéder à l'application</button>
+    <div id="login-err">Mot de passe incorrect. Réessayez.</div>
+    <div id="login-footer">COMMISSAIRE DE JUSTICE · COMMISSAIRE-PRISEUR JUDICIAIRE</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  var PWD = "Fagiano2026!";
+  var KEY = "fagiano_auth_v1";
+  function checkLogin(){
+    var val = document.getElementById("login-input").value;
+    if(val === PWD){
+      sessionStorage.setItem(KEY,"1");
+      document.getElementById("login-overlay").style.display="none";
+      document.getElementById("login-err").style.display="none";
+    } else {
+      document.getElementById("login-err").style.display="block";
+      document.getElementById("login-input").value="";
+      document.getElementById("login-input").focus();
+    }
+  }
+  window.checkLogin = checkLogin;
+  if(sessionStorage.getItem(KEY)==="1"){
+    document.getElementById("login-overlay").style.display="none";
+  }
+})();
+</script>
+
 <div class="container">
 
 <!-- ══ LOGO ══ -->
@@ -1206,7 +1260,7 @@ function renderExpThumbs(){
     html+='<div class="th-label" contenteditable="true" onblur="updateExpLabel('+i+',this.textContent.trim())">'+img.label+'</div>';
     html+='</div>';
   });
-  html+='<div class="exp-thumb-add" onclick="document.getElementById('exp-img-input').click()">';
+  html+='<div class="exp-thumb-add" onclick="triggerExpInput()">';
   html+='<i class="ti ti-plus" style="font-size:16px"></i><span>Ajouter</span></div>';
   el.innerHTML=html;
 }
@@ -1502,7 +1556,7 @@ document.addEventListener('keydown',function(e){
        'mandNom':'Madame Julie BRARD VEDEL',
        'mandOrg':'Mandataire Judiciaire à la Protection des Majeurs',
        'mandAdresse':'BP 101, 13701 LA CIOTAT',
-       'mandTribunal':'Tribunal de Proximité d'AUBAGNE',
+       'mandTribunal':"Tribunal de Proximité d'AUBAGNE",
        'mandJugement':'2026-04-07','mandVille':'AUBAGNE'},
     rows:rows.map(function(r){return Object.assign({},r);}),
     dateMaj:Date.now()
