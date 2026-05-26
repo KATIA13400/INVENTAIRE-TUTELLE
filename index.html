@@ -169,26 +169,176 @@ td textarea{overflow:hidden;line-height:1.5;min-height:28px}
 .api-banner strong{display:block;margin-bottom:4px;font-size:13px;color:var(--tc1)}
 .api-banner input{font-family:inherit;font-size:12px;border:1px solid var(--tc3);border-radius:var(--radius);padding:5px 9px;background:#fff;color:var(--text);width:100%;margin-top:4px}
 </style>
+
+<style id="row-photos-style">
+/* ── Photos par ligne ── */
+.row-photo-btn{background:none;border:1px solid var(--tc3);border-radius:6px;padding:3px 6px;cursor:pointer;color:var(--tc2);font-size:12px;display:flex;align-items:center;gap:3px;white-space:nowrap;flex-shrink:0}
+.row-photo-btn:hover{background:var(--tc5)}
+.row-photo-btn .rp-count{background:var(--tc1);color:#fff;border-radius:10px;padding:1px 5px;font-size:10px;font-weight:700;margin-left:2px}
+
+/* Modal photos par ligne */
+#modal-row-photos{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:3000;align-items:center;justify-content:center;padding:16px;box-sizing:border-box}
+#modal-row-photos.active{display:flex}
+#mrp-box{background:#fff;border-radius:12px;padding:20px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.3)}
+#mrp-title{font-size:14px;font-weight:700;color:var(--tc1);margin-bottom:12px;display:flex;align-items:center;justify-content:space-between}
+#mrp-title span{font-size:12px;color:var(--text3);font-weight:400;max-width:70%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mrp-drop{border:2px dashed var(--tc3);border-radius:10px;padding:14px;text-align:center;cursor:pointer;margin-bottom:10px;transition:background .15s}
+.mrp-drop:hover,.mrp-drop.drag{background:var(--tc5)}
+.mrp-drop p{font-size:12px;color:var(--text2);margin-top:4px}
+.mrp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px;margin-bottom:10px}
+.mrp-card{position:relative;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--bg3)}
+.mrp-card img{width:100%;height:88px;object-fit:cover;display:block;cursor:zoom-in}
+.mrp-card .mrp-del{position:absolute;top:3px;right:3px;background:rgba(0,0,0,0.5);border:none;border-radius:50%;width:18px;height:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px}
+.mrp-card .mrp-del:hover{background:rgba(180,0,0,.85)}
+.mrp-card .mrp-lbl{font-size:10px;color:var(--text2);padding:3px 5px;text-align:center;background:#fff;border-top:1px solid var(--border)}
+.mrp-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+</style>
+
+<style>
+#dossier-zone{display:none}
+#dossier-zone.visible{display:block}
+</style>
+
+<style id="autosave-style">
+#autosave-indicator{
+  position:fixed;top:10px;right:14px;z-index:9998;
+  font-size:11px;color:var(--text3);
+  display:flex;align-items:center;gap:5px;
+  transition:opacity .4s;
+  font-family:'Segoe UI',system-ui,sans-serif;
+}
+#autosave-indicator.saving{color:var(--tc2)}
+#autosave-indicator.saved{color:#2a6a3a}
+#autosave-indicator.hidden{opacity:0;pointer-events:none}
+@keyframes spin-save{to{transform:rotate(360deg)}}
+</style>
+
+<!-- ══ FIREBASE ══ -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+// ── Configuration Firebase ────────────────────────────────────────────────
+const firebaseConfig = {
+  databaseURL: "https://appli-tutelles-default-rtdb.europe-west1.firebasedatabase.app"
+};
+firebase.initializeApp(firebaseConfig);
+const fbdb = firebase.database();
+
+// ── Indicateur sync ────────────────────────────────────────────────────────
+var _fbConnected = false;
+
+// Surveiller la connexion
+fbdb.ref('.info/connected').on('value', function(snap) {
+  _fbConnected = snap.val() === true;
+  var ind = document.getElementById('fb-status');
+  if(ind) {
+    ind.textContent = _fbConnected ? '🟢 Synchronisé' : '🔴 Hors ligne';
+    ind.style.color = _fbConnected ? '#2a6a3a' : '#c0392b';
+  }
+});
+
+// ── SAUVEGARDER vers Firebase ──────────────────────────────────────────────
+function fbSauver(dossierId, dossier) {
+  if(!dossierId || !dossier) return;
+  // Ne pas sauver les photos (trop lourdes) - seulement les données texte
+  var toSave = {
+    id: dossier.id,
+    nom: dossier.nom,
+    annee: dossier.annee,
+    type: dossier.type,
+    dateCreation: dossier.dateCreation,
+    dateMaj: Date.now(),
+    h: dossier.h || {},
+    rows: (dossier.rows || []).map(function(r) {
+      return {id:r.id, desig:r.desig||'', lieu:r.lieu||'', bas:r.bas||'', haut:r.haut||'', memo:r.memo||false};
+    })
+  };
+  fbdb.ref('dossiers/' + dossierId).set(toSave)
+    .then(function() { console.log('Firebase: dossier sauvé', dossierId); })
+    .catch(function(e) { console.warn('Firebase erreur:', e); });
+}
+
+// ── CHARGER depuis Firebase au démarrage ───────────────────────────────────
+function fbChargerTous(callback) {
+  fbdb.ref('dossiers').once('value', function(snap) {
+    var data = snap.val();
+    if(data) {
+      Object.keys(data).forEach(function(id) {
+        var d = data[id];
+        if(d && id !== 'dos_cheylan_2026') {
+          // Fusionner avec localStorage (Firebase prioritaire)
+          allDossiers[id] = d;
+        }
+      });
+      console.log('Firebase: ' + Object.keys(data).length + ' dossiers chargés');
+    }
+    if(callback) callback();
+  }).catch(function(e) {
+    console.warn('Firebase chargement erreur:', e);
+    if(callback) callback();
+  });
+}
+
+// ── ÉCOUTER les changements en temps réel ─────────────────────────────────
+function fbEcouter() {
+  fbdb.ref('dossiers').on('child_added', function(snap) {
+    var d = snap.val();
+    var id = snap.key;
+    if(d && !allDossiers[id]) {
+      allDossiers[id] = d;
+      renderListeDossiers();
+      console.log('Firebase: nouveau dossier reçu', id);
+    }
+  });
+  fbdb.ref('dossiers').on('child_changed', function(snap) {
+    var d = snap.val();
+    var id = snap.key;
+    if(d) {
+      // Mettre à jour seulement si ce n'est pas le dossier actif
+      if(id !== currentDossierId) {
+        allDossiers[id] = d;
+        renderListeDossiers();
+        console.log('Firebase: dossier mis à jour', id);
+      }
+    }
+  });
+  fbdb.ref('dossiers').on('child_removed', function(snap) {
+    var id = snap.key;
+    if(allDossiers[id] && id !== currentDossierId) {
+      delete allDossiers[id];
+      renderListeDossiers();
+    }
+  });
+}
+
+// ── SUPPRIMER depuis Firebase ──────────────────────────────────────────────
+function fbSupprimer(dossierId) {
+  fbdb.ref('dossiers/' + dossierId).remove()
+    .catch(function(e) { console.warn('Firebase suppression erreur:', e); });
+}
+</script>
+
 </head>
 <body>
-
-<!-- ══ ÉCRAN DE CONNEXION ══ -->
+<div id="autosave-indicator" class="hidden">
+  <span id="autosave-icon">✓</span>
+  <span id="autosave-txt">Enregistré</span>
+</div>
+<!-- ══ CONNEXION ══ -->
 <style>
 #login-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:var(--bg);z-index:99999;display:flex;align-items:center;justify-content:center;}
 #login-box{background:#fff;border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:90%;max-width:380px;box-shadow:0 8px 40px rgba(122,46,26,0.18);text-align:center;}
-#login-logo{width:82px;height:82px;object-fit:contain;border-radius:50%;margin-bottom:14px;}
-#login-title{font-family:Georgia,'Times New Roman',serif;font-size:19px;font-weight:700;color:var(--tc3);letter-spacing:1.5px;margin-bottom:3px;}
+#login-title{font-family:Georgia,serif;font-size:19px;font-weight:700;color:var(--tc3);letter-spacing:1.5px;margin-bottom:3px;}
 #login-sub{font-size:11px;color:var(--tc2);letter-spacing:3px;font-family:Georgia,serif;margin-bottom:6px;}
 #login-sep{height:1px;background:var(--tc3);opacity:0.4;margin:10px 0;}
 #login-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px;display:block;}
 #login-input{font-family:inherit;font-size:15px;border:1px solid var(--border);border-radius:8px;padding:10px 14px;background:var(--bg3);color:var(--text);width:100%;box-sizing:border-box;margin-bottom:12px;text-align:center;letter-spacing:4px;}
 #login-input:focus{outline:2px solid var(--tc2);border-color:var(--tc2);}
-#login-btn{background:var(--tc1);color:#fff;border:none;border-radius:8px;padding:11px 0;width:100%;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:.04em;}
+#login-btn{background:var(--tc1);color:#fff;border:none;border-radius:8px;padding:11px 0;width:100%;font-size:13px;font-weight:600;cursor:pointer;}
 #login-btn:hover{background:var(--tc2);}
 #login-err{font-size:12px;color:#c0392b;margin-top:10px;background:#fdecea;border-radius:6px;padding:7px 12px;display:none;}
 #login-footer{font-size:10px;color:var(--text3);margin-top:16px;}
 </style>
-
 <div id="login-overlay">
   <div id="login-box">
     <div id="login-title">M<sup style="font-size:11px;font-family:Georgia,serif">e</sup> FAGIANO Katia</div>
@@ -201,27 +351,12 @@ td textarea{overflow:hidden;line-height:1.5;min-height:28px}
     <div id="login-footer">COMMISSAIRE DE JUSTICE · COMMISSAIRE-PRISEUR JUDICIAIRE</div>
   </div>
 </div>
-
 <script>
 (function(){
-  var PWD = "Fagiano2026!";
-  var KEY = "fagiano_auth_v1";
-  function checkLogin(){
-    var val = document.getElementById("login-input").value;
-    if(val === PWD){
-      sessionStorage.setItem(KEY,"1");
-      document.getElementById("login-overlay").style.display="none";
-      document.getElementById("login-err").style.display="none";
-    } else {
-      document.getElementById("login-err").style.display="block";
-      document.getElementById("login-input").value="";
-      document.getElementById("login-input").focus();
-    }
-  }
-  window.checkLogin = checkLogin;
-  if(sessionStorage.getItem(KEY)==="1"){
-    document.getElementById("login-overlay").style.display="none";
-  }
+  var PWD="Fagiano2026!";var KEY="fagiano_auth_v1";
+  function checkLogin(){var val=document.getElementById("login-input").value;if(val===PWD){sessionStorage.setItem(KEY,"1");document.getElementById("login-overlay").style.display="none";document.getElementById("login-err").style.display="none";}else{document.getElementById("login-err").style.display="block";document.getElementById("login-input").value="";document.getElementById("login-input").focus();}}
+  window.checkLogin=checkLogin;
+  if(sessionStorage.getItem(KEY)==="1"){document.getElementById("login-overlay").style.display="none";}
 })();
 </script>
 
@@ -273,6 +408,7 @@ td textarea{overflow:hidden;line-height:1.5;min-height:28px}
       <select id="new-dos-type" style="font-family:inherit;font-size:13px;border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;width:100%;background:var(--bg3);color:var(--text)">
         <option value="TUTELLE">Tutelle</option>
         <option value="CURATELLE">Curatelle</option>
+        <option value="HABILITATION FAMILIALE">Habilitation familiale</option>
         <option value="SAUVEGARDE DE JUSTICE">Sauvegarde de justice</option>
         <option value="SUCCESSION">Succession</option>
         <option value="AUTRE">Autre</option>
@@ -345,6 +481,7 @@ td textarea{overflow:hidden;line-height:1.5;min-height:28px}
   <div id="ord-sbar" class="sbar hidden"><span id="ord-sbar-icon"></span>&nbsp;<span id="ord-sbar-txt"></span></div>
 </div>
 
+<div id="dossier-zone">
 <!-- EN-TÊTE DOSSIER -->
 <div class="card">
   <div class="section-label"><i class="ti ti-file-description" style="font-size:14px"></i>Dossier en cours</div>
@@ -354,6 +491,7 @@ td textarea{overflow:hidden;line-height:1.5;min-height:28px}
       <select id="dos-type">
         <option value="TUTELLE">Tutelle</option>
         <option value="CURATELLE">Curatelle</option>
+        <option value="HABILITATION FAMILIALE">Habilitation familiale</option>
         <option value="SUCCESSION">Succession</option>
         <option value="SAUVEGARDE DE JUSTICE" selected>Sauvegarde de justice</option>
         <option value="AUTRE">Autre</option>
@@ -387,6 +525,7 @@ td textarea{overflow:hidden;line-height:1.5;min-height:28px}
         <th style="width:11%;text-align:right;background:var(--tc1);color:#fff;">Est. basse (€)</th>
         <th style="width:11%;text-align:right;background:var(--tc1);color:#fff;">Est. haute (€)</th>
         <th style="width:52px;text-align:center;background:var(--tc1);color:#fff;">Mémoire</th>
+        <th style="width:44px;text-align:center;background:var(--tc1);color:#fff;">📷</th>
         <th style="width:76px;text-align:center;background:var(--tc1);color:#fff;">Expertise IA</th>
         <th style="width:26px;background:var(--tc1);"></th>
       </tr>
@@ -469,16 +608,17 @@ td textarea{overflow:hidden;line-height:1.5;min-height:28px}
 
 <div class="actions">
   <button class="btn pdf-btn" onclick="exportPDF()"><i class="ti ti-file-type-pdf" style="font-size:13px"></i> Exporter PDF</button>
-  <button class="btn primary" onclick="exportWord()"><i class="ti ti-file-text" style="font-size:13px"></i> Exporter Word</button>
   <button class="btn" onclick="exportExcel()"><i class="ti ti-table" style="font-size:13px"></i> Exporter Excel</button>
   <button class="btn" onclick="clearDossier()"><i class="ti ti-refresh" style="font-size:13px"></i> Nouveau dossier</button>
   <button class="btn primary" onclick="toggleMentionAbandon()" id="btn-abandon"><i class="ti ti-alert-triangle" style="font-size:13px"></i> Mention abandon</button>
   <button class="btn primary" onclick="toggleMentionBijoux()" id="btn-bijoux"><i class="ti ti-diamond" style="font-size:13px"></i> Mention bijoux</button>
-  <button class="btn" onclick="annuler()" title="Annuler la dernière action (Ctrl+Z)"><i class="ti ti-arrow-back-up" style="font-size:13px"></i> Annuler</button>
-      <button class="btn terra" onclick="saveLocal()"><i class="ti ti-device-floppy" style="font-size:13px"></i> Sauvegarder</button>
+  <span id="fb-status" style="font-size:11px;color:#2a6a3a;margin-right:8px">🔴 Hors ligne</span><button class="btn" onclick="annuler()" title="Annuler la dernière action (Ctrl+Z)"><i class="ti ti-arrow-back-up" style="font-size:13px"></i> Annuler</button>
+      <button class="btn" style="background:#e8f4ea;border-color:#4a9a5a;color:#2a6a3a;font-weight:600" onclick="ouvrirModalMandat()"><i class="ti ti-gavel" style="font-size:13px"></i> Mandat de Vente</button>
+      
   <button class="btn" onclick="loadLocal()"><i class="ti ti-folders" style="font-size:13px"></i> Mes dossiers</button>
 </div>
 <div class="notice"><i class="ti ti-info-circle" style="font-size:12px"></i> PDF A4 portrait — numéros de page X/Y — montants en toutes lettres — logo terracotta.</div>
+</div><!-- /dossier-zone -->
 
 </div>
 
@@ -522,6 +662,7 @@ td textarea{overflow:hidden;line-height:1.5;min-height:28px}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <script>
 let rows=[], rowId=0, photos=[];
+let rowPhotos={};  // Photos indexées par ligne : {rowId: [{id,src,label}]}
 let expImages=[], expHistory=[];
 let currentDossierId=null;  // ID du dossier en cours
 let allDossiers={};         // Tous les dossiers stockés
@@ -1073,6 +1214,18 @@ function updateTargetLineSelector(){
 
 
 function renderRows(){
+  // Mémoriser focus et position curseur avant de recréer le DOM
+  var activeEl=document.activeElement;
+  var savedFocus=null;
+  if(activeEl && activeEl.closest && activeEl.closest && activeEl.closest('#inv-body')){
+    savedFocus={
+      rowId: activeEl.dataset ? parseInt(activeEl.dataset.id) : null,
+      field: activeEl.dataset ? activeEl.dataset.f : null,
+      start: activeEl.selectionStart||0,
+      end: activeEl.selectionEnd||0,
+      tag: activeEl.tagName
+    };
+  }
   var tbody=document.getElementById('inv-body');
   tbody.innerHTML='';
   rows.forEach(function(r,i){
@@ -1081,11 +1234,14 @@ function renderRows(){
     var chk=r.memo?'checked':'';
     var html='';
     html+='<td class="num">'+(i+1)+'</td>';
-    html+='<td style="vertical-align:top;padding-top:4px"><textarea data-f="desig" data-id="'+r.id+'" placeholder="Description…" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);resize:none;overflow:hidden;line-height:1.5;padding:2px 3px;border-radius:4px;outline:none;min-height:26px;display:block">'+esc(r.desig)+'</textarea></td>';
+    html+='<td style="vertical-align:top;padding-top:4px"><div style="display:flex;align-items:flex-start;gap:3px"><textarea data-f="desig" data-id="'+r.id+'" placeholder="Description…" style="flex:1;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);resize:none;overflow:hidden;line-height:1.5;padding:2px 3px;border-radius:4px;outline:none;min-height:26px;display:block">'+esc(r.desig)+'</textarea><button class="btn-mic" data-id="'+r.id+'" onclick="toggleDictaphone(this,'+r.id+')" title="Dicter" style="flex-shrink:0;margin-top:2px;background:none;border:1px solid var(--border);border-radius:6px;padding:3px 5px;cursor:pointer;color:var(--text3);font-size:13px;line-height:1"><i class=\"ti ti-microphone\"></i></button></div></td>';
     html+='<td><input list="pieces-list" data-f="lieu" data-id="'+r.id+'" value="'+esc(r.lieu||'')+'" placeholder="Pièce…" style="font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);width:100%;padding:2px 3px;border-radius:4px;outline:none;"/></td>';
     html+='<td><input type="text" inputmode="decimal" class="r" data-f="bas" data-id="'+r.id+'" value="'+(r.bas||'')+'" placeholder="0" '+dis+' oninput="updateTotals()" style="font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);width:100%;padding:2px 3px;border-radius:4px;outline:none;text-align:right;"/></td>';
     html+='<td><input type="text" inputmode="decimal" class="r" data-f="haut" data-id="'+r.id+'" value="'+(r.haut||'')+'" placeholder="0" '+dis+' oninput="updateTotals()" style="font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);width:100%;padding:2px 3px;border-radius:4px;outline:none;text-align:right;"/></td>';
-    html+='<td style="text-align:center"><input type="checkbox" data-f="memo" data-id="'+r.id+'" '+chk+'/></td>';
+    html+='<td style="text-align:center;white-space:nowrap"><input type="checkbox" data-f="memo" data-id="'+r.id+'" '+chk+'/></td>';
+    var rpCount=(rowPhotos[r.id]||[]).length;
+    var rpBadge=rpCount>0?'<span class="rp-count">'+rpCount+'</span>':'';
+    html+='<td style="text-align:center"><button class="row-photo-btn" onclick="ouvrirPhotosLigne('+r.id+')" title="Photos de ce bien">📷'+rpBadge+'</button></td>';
     html+='<td style="text-align:center"><button class="btn-exp-row" onclick="ouvrirExpertisePourLigne('+(i+1)+')"><i class="ti ti-camera"></i> Expert.</button></td>';
     html+='<td style="white-space:nowrap">';
     html+='<button class="btn-ins" onclick="insertRowAfter('+r.id+')" title="Insérer une ligne après"><i class="ti ti-row-insert-bottom"></i></button>';
@@ -1103,6 +1259,24 @@ function renderRows(){
     });
     el.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.tagName!=='TEXTAREA')addRow();});
   });
+  // Auto-resize TOUTES les textarea au rendu initial
+  tbody.querySelectorAll('textarea').forEach(function(ta){
+    ta.style.height='auto';
+    ta.style.height=ta.scrollHeight+'px';
+  });
+  // Restaurer le focus et la position du curseur
+  if(savedFocus && savedFocus.rowId){
+    var selector = savedFocus.tag==='TEXTAREA'
+      ? 'textarea[data-id="'+savedFocus.rowId+'"][data-f="'+savedFocus.field+'"]'
+      : 'input[data-id="'+savedFocus.rowId+'"][data-f="'+savedFocus.field+'"]';
+    var elToFocus = tbody.querySelector(selector);
+    if(elToFocus){
+      elToFocus.focus();
+      try{
+        elToFocus.setSelectionRange(savedFocus.start, savedFocus.end);
+      }catch(e){}
+    }
+  }
   tbody.querySelectorAll('input[type="checkbox"]').forEach(el=>{
     el.addEventListener('change',e=>{
       const id=parseInt(e.target.dataset.id),checked=e.target.checked;
@@ -1118,10 +1292,16 @@ function renderRows(){
 
 function clearDossier(){
   if(!confirm('Effacer le dossier en cours ?'))return;
-  rows=[];rowId=0;photos=[];
-  ['dos-num','dos-date','dos-heure'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  rows=[];rowId=0;photos=[];rowPhotos={};
+  currentDossierId=null;
+  document.getElementById('badge-dossier-actif').style.display='none';
+  document.getElementById('dossier-zone').classList.remove('visible');
+  ['dos-num','dos-date','dos-heure','dos-personne','dos-adresse',
+   'mand-nom','mand-org','mand-adresse','mand-tribunal','mand-jugement','mand-ville']
+  .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   clearExpertise();
   renderRows();
+  renderListeDossiers();
 }
 
 function saveLocal(){
@@ -1302,8 +1482,62 @@ async function lancerExpertise(reponseSupp){
 }
 function repondreExpertise(){const ans=document.getElementById('exp-answer').value.trim();if(!ans)return;if(expHistory.length>0)expHistory[expHistory.length-1].u=ans;lancerExpertise(ans);}
 function clearExpertise(){expImages=[];expHistory=[];document.getElementById('exp-img-input').value='';document.getElementById('btn-expertiser').disabled=true;document.getElementById('exp-question-block').style.display='none';['exp-desig','exp-bas','exp-haut'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});setExpStatus('hidden','');renderExpThumbs();}
-function injecterDansLigne(){const sel=document.getElementById('exp-target-line').value;if(!sel){alert('Sélectionnez une ligne.');return;}const idx=parseInt(sel)-1;if(idx<0||idx>=rows.length)return;const r=rows[idx];const dv=document.getElementById('exp-desig').value;const bv=document.getElementById('exp-bas').value;const hv=document.getElementById('exp-haut').value;if(dv)r.desig=dv;if(bv)r.bas=bv;if(hv)r.haut=hv;renderRows();setExpStatus('ok','Données injectées dans la ligne '+(idx+1)+'.');}
-function ajouterCommeNouvelleLigne(){addRow({desig:document.getElementById('exp-desig').value,bas:document.getElementById('exp-bas').value,haut:document.getElementById('exp-haut').value,lieu:'',memo:false});setExpStatus('ok','Nouvelle ligne ajoutée.');}
+function injecterDansLigne(){
+  const sel=document.getElementById('exp-target-line').value;
+  if(!sel){alert('Sélectionnez une ligne.');return;}
+  const idx=parseInt(sel)-1;
+  if(idx<0||idx>=rows.length)return;
+  const r=rows[idx];
+  const dv=document.getElementById('exp-desig').value;
+  const bv=document.getElementById('exp-bas').value;
+  const hv=document.getElementById('exp-haut').value;
+  if(dv)r.desig=dv;
+  if(bv)r.bas=bv;
+  if(hv)r.haut=hv;
+  // Transférer les photos d'expertise vers la ligne
+  if(expImages.length>0){
+    if(!rowPhotos[r.id])rowPhotos[r.id]=[];
+    expImages.forEach(function(img){
+      rowPhotos[r.id].push({id:Date.now()+Math.random(),src:'data:image/jpeg;base64,'+img.b64.split(',')[1],label:img.label||'Photo expertise'});
+    });
+    syncRowPhotosToGallery();
+  }
+  // Mettre à jour uniquement les cellules concernées sans recréer tout le DOM
+  const tbody=document.getElementById('inv-body');
+  const trs=[...tbody.querySelectorAll('tr')];
+  if(trs[idx]){
+    const ta=trs[idx].querySelector('textarea[data-f="desig"]');
+    const ib=trs[idx].querySelector('input[data-f="bas"]');
+    const ih=trs[idx].querySelector('input[data-f="haut"]');
+    if(ta&&dv){ta.value=dv;ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';}
+    if(ib&&bv)ib.value=bv;
+    if(ih&&hv)ih.value=hv;
+    // Mettre à jour le badge photo
+    var btn=trs[idx].querySelector('.row-photo-btn');
+    if(btn){
+      var cnt=(rowPhotos[r.id]||[]).length;
+      btn.innerHTML='📷'+(cnt>0?'<span class="rp-count">'+cnt+'</span>':'');
+    }
+  }
+  updateTotals();
+  setExpStatus('ok','Données et '+(expImages.length)+' photo(s) injectées dans la ligne '+(idx+1)+'.');
+}
+function ajouterCommeNouvelleLigne(){
+  var newRow={desig:document.getElementById('exp-desig').value,bas:document.getElementById('exp-bas').value,haut:document.getElementById('exp-haut').value,lieu:'',memo:false};
+  var newId=++rowId;
+  var r=Object.assign({id:newId},newRow);
+  rows.push(r);
+  // Transférer les photos d'expertise vers la nouvelle ligne
+  if(expImages.length>0){
+    rowPhotos[newId]=[];
+    expImages.forEach(function(img){
+      rowPhotos[newId].push({id:Date.now()+Math.random(),src:'data:image/jpeg;base64,'+img.b64.split(',')[1],label:img.label||'Photo expertise'});
+    });
+    syncRowPhotosToGallery();
+  }
+  renderRows();
+  setExpStatus('ok','Nouvelle ligne ajoutée avec '+(expImages.length)+' photo(s).');
+}
 function ouvrirExpertisePourLigne(num){document.querySelector('.expertise-card').scrollIntoView({behavior:'smooth',block:'start'});document.getElementById('exp-target-line').value=String(num);setTimeout(()=>document.getElementById('exp-img-input').click(),400);}
 
 // ── ORDONNANCE ────────────────────────────────────────────────────────────────
@@ -1370,6 +1604,16 @@ function renderListeDossiers(){
   
   // Trier les années décroissantes
   const anneesSorted=Object.keys(parAnnee).sort((a,b)=>b-a);
+  // Dans chaque année, trier par numéro IT croissant
+  anneesSorted.forEach(function(annee){
+    parAnnee[annee].sort(function(a,b){
+      var na = (a.h&&a.h.dosNum?a.h.dosNum:'').match(/IT26(\d+)/i);
+      var nb = (b.h&&b.h.dosNum?b.h.dosNum:'').match(/IT26(\d+)/i);
+      var ia = na ? parseInt(na[1]) : 9999;
+      var ib = nb ? parseInt(nb[1]) : 9999;
+      return ia - ib;
+    });
+  });
   
   let html='';
   anneesSorted.forEach(function(annee){
@@ -1378,9 +1622,10 @@ function renderListeDossiers(){
       var isActive=d.id===currentDossierId;
       var nbBiens=d.rows?d.rows.length:0;
       var dateCreation=d.dateCreation?new Date(d.dateCreation).toLocaleDateString('fr-FR'):'';
-      html+='<div class="dossier-card'+(isActive?' active':'')+'" onclick="ouvrirDossier(''+d.id+'')">';
-      html+='<button class="dc-del" onclick="event.stopPropagation();supprimerDossier(''+d.id+'')" title="Supprimer"><i class="ti ti-trash"></i></button>';
-      html+='<div class="dc-nom" title="'+(d.nom||'')+'">'+(d.nom||'Sans nom')+'</div>';
+      html+='<div class="dossier-card'+(isActive?' active':'')+' " onclick="ouvrirDossier(\''+ d.id +'\')">';
+      html+='<button class="dc-del" onclick="event.stopPropagation();supprimerDossier(\''+ d.id +'\')" title="Supprimer"><i class="ti ti-trash"></i></button>';
+      var numLabel = (d.h&&d.h.dosNum) ? '<span style="font-size:10px;font-weight:700;color:var(--tc2);margin-right:5px">'+(d.h.dosNum)+'</span>' : '';
+      html+='<div class="dc-nom" title="'+(d.nom||'')+'">'+numLabel+(d.nom||'Sans nom')+'</div>';
       html+='<div class="dc-info">'+(d.type||'')+' · '+nbBiens+' bien(s)</div>';
       html+='<div class="dc-info" style="color:var(--text3)">'+dateCreation+'</div>';
       if(isActive)html+='<div style="margin-top:4px;font-size:10px;color:var(--tc2);font-weight:600">✓ EN COURS</div>';
@@ -1401,6 +1646,21 @@ function fermerModalNouveauDossier(){
   document.getElementById('modal-nouveau').classList.remove('active');
 }
 
+function getProchainNumero(){
+  // Cherche le plus grand numéro IT26XXX parmi tous les dossiers
+  var max = 33; // IT26033 = Cheylan, prochain = 34
+  Object.values(allDossiers).forEach(function(d){
+    var num = d.h && d.h.dosNum ? d.h.dosNum : '';
+    var m = num.match(/IT26(\d+)/i);
+    if(m){
+      var n = parseInt(m[1]);
+      if(n > max) max = n;
+    }
+  });
+  var suivant = max + 1;
+  return 'IT26' + String(suivant).padStart(3,'0');
+}
+
 function creerNouveauDossier(){
   const nom=document.getElementById('new-dos-nom').value.trim();
   const annee=document.getElementById('new-dos-annee').value;
@@ -1410,11 +1670,12 @@ function creerNouveauDossier(){
   // Sauvegarder le dossier en cours si existant
   if(currentDossierId)sauverDossierEnCours();
   
+  const numAuto = getProchainNumero();
   const id=genId();
   allDossiers[id]={
     id,nom,annee,type,
     dateCreation:Date.now(),
-    h:{dosType:type,dosNum:'',dosDate:'',dosHeure:'',dosPersonne:'',dosAdresse:'',
+    h:{dosType:type,dosNum:numAuto,dosDate:'',dosHeure:'',dosPersonne:'',dosAdresse:'',
        mandNom:'',mandOrg:'',mandAdresse:'',mandTribunal:'',mandJugement:'',mandVille:''},
     rows:[],photos:[]
   };
@@ -1445,21 +1706,43 @@ function ouvrirDossier(id){
   
   // Charger les lignes
   rows=[];rowId=0;
-  photos=[];  // Photos non sauvegardées — à réimporter si besoin
-  (d.rows||[]).forEach(r=>addRow(r));
+  photos=[];rowPhotos={};
+
+  // Construire la liste des rows à charger
+  var rowsToLoad;
+  if(id==='dos_cheylan_2026'){
+    // Cheylan : toujours depuis DATA_CHEYLAN (source de vérité)
+    // + eventuellement les modifs sauvegardées dans d.rows
+    rowsToLoad = (d.rows && d.rows.length>0)
+      ? d.rows
+      : DATA_CHEYLAN.map(function(d2,i){return{id:i+1,desig:d2.desig||'',lieu:d2.lieu||'',bas:d2.bas||'',haut:d2.haut||'',memo:d2.memo||false};});
+  } else {
+    rowsToLoad = d.rows||[];
+  }
+
+  // Charger toutes les lignes d'un coup sans renderRows intermédiaire
+  rowsToLoad.forEach(function(r){
+    var newId=++rowId;
+    var row={id:newId,desig:r.desig||'',lieu:r.lieu||'',bas:r.bas||'',haut:r.haut||'',memo:r.memo||false};
+    rows.push(row);
+  });
+  renderRows();  // Un seul appel pour toutes les lignes
+  updateTotals();
   renderGallery();
   
   // Mettre à jour le badge
   const badge=document.getElementById('badge-dossier-actif');
   badge.textContent=d.nom;badge.style.display='inline';
   
+  // Afficher la zone dossier
+  document.getElementById('dossier-zone').classList.add('visible');
+
   // Fermer la liste et scroller en haut
   document.getElementById('liste-dossiers').style.display='none';
   document.getElementById('btn-toggle-liste').innerHTML='<i class="ti ti-list" style="font-size:13px"></i> Tous les dossiers';
   window.scrollTo({top:0,behavior:'smooth'});
   
   renderListeDossiers();
-  alert('Dossier "'+d.nom+'" ouvert.');
 }
 
 function sauverDossierEnCours(){
@@ -1473,6 +1756,8 @@ function sauverDossierEnCours(){
     dateMaj:Date.now()
   };
   sauverTousDossiers();
+  // Synchroniser vers Firebase
+  fbSauver(currentDossierId, allDossiers[currentDossierId]);
 }
 
 function supprimerDossier(id){
@@ -1481,8 +1766,9 @@ function supprimerDossier(id){
   delete allDossiers[id];
   if(currentDossierId===id){
     currentDossierId=null;
-    rows=[];rowId=0;photos=[];
+    rows=[];rowId=0;photos=[];rowPhotos={};
     document.getElementById('badge-dossier-actif').style.display='none';
+    document.getElementById('dossier-zone').classList.remove('visible');
     // Vider le formulaire
     ['dos-num','dos-date','dos-heure','dos-personne','dos-adresse',
      'mand-nom','mand-org','mand-adresse','mand-tribunal','mand-jugement','mand-ville']
@@ -1493,18 +1779,118 @@ function supprimerDossier(id){
   renderListeDossiers();
 }
 
-// Sauvegarde automatique toutes les 30 secondes
-setInterval(()=>{if(currentDossierId)sauverDossierEnCours();},30000);
+// ── SAUVEGARDE AUTOMATIQUE style Apple ───────────────────────────────────
+var _autosaveTimer = null;
+
+function showSaving(){
+  var ind = document.getElementById('autosave-indicator');
+  var icon = document.getElementById('autosave-icon');
+  var txt = document.getElementById('autosave-txt');
+  if(!ind) return;
+  ind.className = 'saving';
+  icon.textContent = '↻';
+  icon.style.display = 'inline-block';
+  icon.style.animation = 'spin-save .6s linear infinite';
+  txt.textContent = 'Enregistrement…';
+}
+
+function showSaved(){
+  var ind = document.getElementById('autosave-indicator');
+  var icon = document.getElementById('autosave-icon');
+  var txt = document.getElementById('autosave-txt');
+  if(!ind) return;
+  ind.className = 'saved';
+  icon.textContent = '✓';
+  icon.style.animation = 'none';
+  txt.textContent = 'Enregistré';
+  // Disparaît après 2s
+  setTimeout(function(){ ind.className = 'hidden'; }, 2000);
+}
+
+function autosave(){
+  if(!currentDossierId) return;
+  showSaving();
+  if(_autosaveTimer) clearTimeout(_autosaveTimer);
+  _autosaveTimer = setTimeout(function(){
+    sauverDossierEnCours();
+    showSaved();
+  }, 1500);  // 1.5s après la dernière modif
+}
+
+// Déclencher autosave sur toute interaction avec le tableau
+document.addEventListener('input', function(e){
+  var target = e.target;
+  // Seulement si c'est dans le tableau ou les champs dossier
+  if(target.closest && (target.closest('#inv-body') || target.closest('.card'))){
+    autosave();
+  }
+});
+document.addEventListener('change', function(e){
+  var target = e.target;
+  if(target.closest && (target.closest('#inv-body') || target.closest('.card'))){
+    autosave();
+  }
+});
 
 // Sauvegarde avant fermeture
-window.addEventListener('beforeunload',()=>{if(currentDossierId)sauverDossierEnCours();});
+window.addEventListener('beforeunload', function(){
+  if(currentDossierId){ sauverDossierEnCours(); }
+});
 
 
 // Init
 document.getElementById('dos-date').value=new Date().toISOString().split('T')[0];
 const savedKey=localStorage.getItem('fagiano_api_key');if(savedKey)document.getElementById('api-key').value=savedKey;
-// Charger tous les dossiers au démarrage
+
+// Dossiers chargés via Firebase ci-dessous
 chargerTousDossiers();
+// ── Charger Firebase puis afficher la liste ───────────────────────────────
+fbChargerTous(function() {
+  // Initialiser Cheylan si absent (après chargement Firebase)
+  if(!allDossiers['dos_cheylan_2026']){
+    allDossiers['dos_cheylan_2026']={
+      id:'dos_cheylan_2026',
+      nom:'MARROT Veuve CHEYLAN Nicole 2026',
+      annee:'2026',
+      type:'SAUVEGARDE DE JUSTICE',
+      dateCreation:1747526400000,
+      h:{
+        dosType:'SAUVEGARDE DE JUSTICE',
+        dosNum:'IT26033',
+        dosDate:'2026-05-18',
+        dosHeure:'',
+        dosPersonne:'Madame Nicole MARROT Veuve CHEYLAN',
+        dosAdresse:'LE BOCAGE, 36 Bd Jean Jacques Rousseau, 13821 LA PENNE SUR HUVEAUNE',
+        mandNom:'Madame Julie BRARD VEDEL',
+        mandOrg:'Mandataire Judiciaire à la Protection des Majeurs',
+        mandAdresse:'BP 101, 13701 LA CIOTAT',
+        mandTribunal:"Tribunal de Proximité d'AUBAGNE",
+        mandJugement:'2026-04-07',
+        mandVille:'AUBAGNE'
+      },
+      rows:DATA_CHEYLAN.map(function(d,i){return{id:i+1,desig:d.desig||'',lieu:d.lieu||'',bas:d.bas||'',haut:d.haut||'',memo:d.memo||false};}),
+      dateMaj:Date.now()
+    };
+    // Sauver dans Firebase et localStorage
+    fbSauver('dos_cheylan_2026', allDossiers['dos_cheylan_2026']);
+    try{sauverTousDossiers();}catch(e){}
+    console.log('Cheylan IT26033 initialisé et sauvé dans Firebase');
+  } else if(!allDossiers['dos_cheylan_2026'].h.dosNum){
+    allDossiers['dos_cheylan_2026'].h.dosNum='IT26033';
+    fbSauver('dos_cheylan_2026', allDossiers['dos_cheylan_2026']);
+    try{sauverTousDossiers();}catch(e){}
+  } else if(!allDossiers['dos_cheylan_2026'].rows || allDossiers['dos_cheylan_2026'].rows.length===0){
+    allDossiers['dos_cheylan_2026'].rows=DATA_CHEYLAN.map(function(d,i){return{id:i+1,desig:d.desig||'',lieu:d.lieu||'',bas:d.bas||'',haut:d.haut||'',memo:d.memo||false};});
+    fbSauver('dos_cheylan_2026', allDossiers['dos_cheylan_2026']);
+    try{sauverTousDossiers();}catch(e){}
+  }
+  renderRows();
+  updateTotals();
+  document.getElementById('liste-dossiers').style.display='block';
+  document.getElementById('btn-toggle-liste').innerHTML='<i class="ti ti-chevron-up" style="font-size:13px"></i> Masquer';
+  renderListeDossiers();
+  fbEcouter();
+});
 // Fermer modal au clic extérieur
 document.getElementById('modal-nouveau').addEventListener('click',function(e){if(e.target===this)fermerModalNouveauDossier();});
 // Raccourci Ctrl+Z pour annuler
@@ -1517,56 +1903,358 @@ document.addEventListener('keydown',function(e){
   }
 });
 
-// CHEYLAN — chargement direct garanti
-(function(){
-  rows=[];rowId=0;
-  DATA_CHEYLAN.forEach(function(d,i){
-    var r={id:i+1,desig:d.desig||'',lieu:d.lieu||'',bas:d.bas||'',haut:d.haut||'',memo:d.memo||false};
-    rows.push(r);
-    rowId=i+1;
-  });
-  currentDossierId='dos_cheylan_2026';
-  // Remplir le formulaire
-  var fields={
-    'dos-type':'SAUVEGARDE DE JUSTICE',
-    'dos-date':'2026-05-18',
-    'dos-personne':'Madame Nicole MARROT Veuve CHEYLAN',
-    'dos-adresse':'LE BOCAGE, 36 Bd Jean Jacques Rousseau, 13821 LA PENNE SUR HUVEAUNE',
-    'mand-nom':'Madame Julie BRARD VEDEL',
-    'mand-org':'Mandataire Judiciaire à la Protection des Majeurs',
-    'mand-adresse':'BP 101, 13701 LA CIOTAT',
-    'mand-tribunal':"Tribunal de Proximité d'AUBAGNE",
-    'mand-jugement':'2026-04-07',
-    'mand-ville':'AUBAGNE'
-  };
-  Object.keys(fields).forEach(function(id){
-    var el=document.getElementById(id);
-    if(el)el.value=fields[id];
-  });
-  var badge=document.getElementById('badge-dossier-actif');
-  if(badge){badge.textContent='MARROT Veuve CHEYLAN Nicole 2026';badge.style.display='inline';}
-  // Sauvegarder dans allDossiers
-  allDossiers['dos_cheylan_2026']={
-    id:'dos_cheylan_2026',nom:'MARROT Veuve CHEYLAN Nicole 2026',
-    annee:'2026',type:'SAUVEGARDE DE JUSTICE',
-    dateCreation:1747526400000,
-    h:{'dosType':'SAUVEGARDE DE JUSTICE','dosDate':'2026-05-18',
-       'dosPersonne':'Madame Nicole MARROT Veuve CHEYLAN',
-       'dosAdresse':'LE BOCAGE, 36 Bd Jean Jacques Rousseau, 13821 LA PENNE SUR HUVEAUNE',
-       'mandNom':'Madame Julie BRARD VEDEL',
-       'mandOrg':'Mandataire Judiciaire à la Protection des Majeurs',
-       'mandAdresse':'BP 101, 13701 LA CIOTAT',
-       'mandTribunal':"Tribunal de Proximité d'AUBAGNE",
-       'mandJugement':'2026-04-07','mandVille':'AUBAGNE'},
-    rows:rows.map(function(r){return Object.assign({},r);}),
-    dateMaj:Date.now()
-  };
-  try{sauverTousDossiers();}catch(e){}
-  console.log('CHEYLAN: '+rows.length+' lignes chargées');
-  setTimeout(function(){renderRows();updateTotals();}, 100);
-})();
+// Dossier CHEYLAN enregistré via chargerTousDossiers() au démarrage
 
 // Rendu initial (déjà fait dans le bloc CHEYLAN si dossier chargé)
 </script>
+
+
+<!-- ══ PHOTOS PAR LIGNE ══ -->
+<div id="modal-row-photos">
+  <div id="mrp-box">
+    <div id="mrp-title">
+      📷 Photos du bien
+      <span id="mrp-desig-label"></span>
+    </div>
+    <div class="mrp-drop" id="mrp-drop"
+         onclick="document.getElementById('mrp-file-input').click()"
+         ondragover="event.preventDefault();this.classList.add('drag')"
+         ondragleave="this.classList.remove('drag')"
+         ondrop="mrpHandleDrop(event)">
+      <div style="font-size:24px">📷</div>
+      <strong style="font-size:13px">Ajouter des photos</strong>
+      <p>Cliquer, glisser ou utiliser l'appareil photo</p>
+    </div>
+    <input type="file" id="mrp-file-input" accept="image/*" multiple capture="environment" style="display:none" onchange="mrpHandleFiles(this.files)"/>
+    <div class="mrp-grid" id="mrp-grid"></div>
+    <div class="mrp-actions">
+      <button class="btn" onclick="fermerPhotosLigne()">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── PHOTOS PAR LIGNE ─────────────────────────────────────────────────────
+var _mrpCurrentRowId = null;
+
+function ouvrirPhotosLigne(rowId){
+  _mrpCurrentRowId = rowId;
+  var r = rows.find(function(x){return x.id===rowId;});
+  document.getElementById('mrp-desig-label').textContent = r ? (r.desig||'').substring(0,60) : '';
+  mrpRenderGrid();
+  document.getElementById('modal-row-photos').classList.add('active');
+}
+
+function fermerPhotosLigne(){
+  document.getElementById('modal-row-photos').classList.remove('active');
+  _mrpCurrentRowId = null;
+  // Re-rendre les lignes pour mettre à jour les badges
+  renderRows();
+}
+
+document.getElementById('modal-row-photos').addEventListener('click', function(e){
+  if(e.target===this) fermerPhotosLigne();
+});
+
+function mrpHandleDrop(e){
+  e.preventDefault();
+  document.getElementById('mrp-drop').classList.remove('drag');
+  var files = e.dataTransfer.files ? Array.from(e.dataTransfer.files) : [];
+  mrpHandleFiles(files);
+}
+
+function mrpHandleFiles(files){
+  if(!_mrpCurrentRowId) return;
+  Array.from(files).forEach(function(file){
+    if(!file.type.startsWith('image/')) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      compressImage(ev.target.result, 800, 0.65, function(compressed){
+        if(!rowPhotos[_mrpCurrentRowId]) rowPhotos[_mrpCurrentRowId]=[];
+        rowPhotos[_mrpCurrentRowId].push({
+          id: Date.now()+Math.random(),
+          src: compressed,
+          label: file.name.replace(/\.[^.]+$/,'')
+        });
+        mrpRenderGrid();
+        // Mettre à jour aussi la galerie principale
+        // (on synchronise les photos de ligne dans la galerie globale)
+        syncRowPhotosToGallery();
+      });
+    };
+    reader.readAsDataURL(file);
+  });
+  // Reset input
+  document.getElementById('mrp-file-input').value='';
+}
+
+function mrpDeletePhoto(rowId, photoId){
+  if(!rowPhotos[rowId]) return;
+  rowPhotos[rowId] = rowPhotos[rowId].filter(function(p){return p.id!==photoId;});
+  mrpRenderGrid();
+  syncRowPhotosToGallery();
+}
+
+function mrpRenderGrid(){
+  var grid = document.getElementById('mrp-grid');
+  var rid = _mrpCurrentRowId;
+  var list = rowPhotos[rid]||[];
+  if(list.length===0){
+    grid.innerHTML='<div style="color:var(--text3);font-size:12px;text-align:center;padding:10px;grid-column:1/-1">Aucune photo pour ce bien</div>';
+    return;
+  }
+  grid.innerHTML = list.map(function(p){
+    return '<div class="mrp-card">'+
+      '<img src="'+p.src+'" alt="photo" onclick="openZoom('+photos.findIndex(function(x){return x.id===p.id;})+')"/>'+
+      '<button class="mrp-del" onclick="mrpDeletePhoto('+rid+','+p.id+')">×</button>'+
+      '<div class="mrp-lbl">'+p.label+'</div>'+
+      '</div>';
+  }).join('');
+}
+
+// Synchroniser les photos de ligne vers la galerie principale (pour le PDF)
+function syncRowPhotosToGallery(){
+  // On reconstruit photos[] à partir de rowPhotos{}
+  // En gardant aussi les photos sans ligne
+  var orphans = photos.filter(function(p){return !p.rowId;});
+  var fromRows = [];
+  Object.keys(rowPhotos).forEach(function(rid){
+    (rowPhotos[rid]||[]).forEach(function(p){
+      fromRows.push({id:p.id, src:p.src, lineNum:parseInt(rid), rowId:parseInt(rid)});
+    });
+  });
+  photos = orphans.concat(fromRows);
+  renderGallery();
+}
+</script>
+
+<!-- ══ DICTAPHONE ══ -->
+<style>
+.btn-mic.recording{color:#c0392b !important;border-color:#c0392b !important;background:#fdecea !important;animation:pulse-mic .8s ease-in-out infinite;}
+@keyframes pulse-mic{0%,100%{opacity:1}50%{opacity:.4}}
+</style>
+<script>
+var _dictRecog=null,_dictActiveBtn=null,_dictActiveId=null;
+function toggleDictaphone(btn,rowId){
+  if(!('webkitSpeechRecognition' in window||'SpeechRecognition' in window)){
+    alert('Dictée vocale non supportée.\nUtilisez Chrome ou Edge.');return;
+  }
+  if(_dictActiveBtn===btn&&_dictRecog){_dictRecog.stop();return;}
+  if(_dictRecog){_dictRecog.stop();}
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  var recog=new SR();
+  recog.lang='fr-FR';recog.continuous=true;recog.interimResults=true;
+  var ta=btn.closest('div').querySelector('textarea');
+  var baseText=ta.value;
+  btn.classList.add('recording');btn.title='Arrêter';
+  _dictActiveBtn=btn;_dictActiveId=rowId;_dictRecog=recog;
+  recog.onresult=function(e){
+    var interim='',final='';
+    for(var i=e.resultIndex;i<e.results.length;i++){
+      if(e.results[i].isFinal)final+=e.results[i][0].transcript;
+      else interim+=e.results[i][0].transcript;
+    }
+    if(final)baseText=(baseText+(baseText?' ':'')+final).trim();
+    ta.value=baseText+(interim?' '+interim:'');
+    ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';
+    var r=rows.find(function(x){return x.id===rowId;});
+    if(r)r.desig=ta.value;
+    updateTotals();
+  };
+  recog.onerror=function(){stopDictaphone(btn);};
+  recog.onend=function(){stopDictaphone(btn);};
+  recog.start();
+}
+function stopDictaphone(btn){
+  if(btn){btn.classList.remove('recording');btn.title='Dicter';}
+  _dictActiveBtn=null;_dictActiveId=null;_dictRecog=null;
+}
+</script>
+
+<!-- ══ MODAL MANDAT DE VENTE ══ -->
+<style>
+.mandat-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.55);z-index:2000;align-items:flex-start;justify-content:center;overflow-y:auto;padding:20px;box-sizing:border-box}
+.mandat-overlay.active{display:flex}
+.mandat-box{background:#fff;border-radius:12px;padding:26px 26px 18px;width:100%;max-width:720px;box-shadow:0 8px 40px rgba(0,0,0,0.25);margin:auto}
+.mandat-box h3{font-size:15px;font-weight:700;color:var(--tc1);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.mdt-section{font-size:10.5px;font-weight:700;color:var(--tc2);text-transform:uppercase;letter-spacing:.07em;margin:14px 0 7px;border-bottom:1px solid var(--border);padding-bottom:3px}
+.mdt-g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:8px}
+.mdt-fg{display:flex;flex-direction:column;gap:3px}
+.mdt-fg label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;font-weight:500}
+.mdt-fg input,.mdt-fg select,.mdt-fg textarea{font-family:inherit;font-size:12px;border:1px solid var(--border);border-radius:6px;padding:6px 9px;background:var(--bg3);color:var(--text);width:100%}
+.mdt-fg textarea{resize:vertical;min-height:48px}
+#mdt-lots-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+#mdt-lots-table thead tr{background:var(--tc1)}
+#mdt-lots-table th{padding:8px 6px;text-align:left;font-size:11px;color:#fff;font-weight:700;white-space:nowrap}
+#mdt-lots-table th.r{text-align:right}
+#mdt-lots-table td{padding:4px 5px;border-bottom:1px solid #ecddd4;vertical-align:middle}
+#mdt-lots-table tr:nth-child(even){background:var(--tc6)}
+#mdt-lots-table tr:nth-child(odd){background:#fff}
+#mdt-lots-table td input[type=text]{font-family:inherit;font-size:11px;border:none;background:transparent;width:100%;padding:2px 3px;border-radius:4px;outline:none}
+#mdt-lots-table td input[type=text]:focus{background:var(--tc5);outline:1px solid var(--tc3)}
+#mdt-lots-table td input[type=text].r{text-align:right}
+.mdt-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}
+@media(max-width:600px){.mdt-g2{grid-template-columns:1fr}}
+</style>
+
+<div class="mandat-overlay" id="modal-mandat">
+  <div class="mandat-box">
+    <h3><i class="ti ti-gavel" style="font-size:16px"></i> Mandat de Vente — Parcs Enchères</h3>
+    <div class="mdt-section">Vendeurs (mandants)</div>
+    <div class="mdt-fg" style="margin-bottom:8px">
+      <label>Nom(s) et adresse(s) des vendeurs</label>
+      <textarea id="mdt-vendeurs" rows="3" placeholder="Ex : Madame X demeurant à…"></textarea>
+    </div>
+    <div class="mdt-section">Biens à vendre — cochez les lots à inclure, modifiez si besoin</div>
+    <div style="overflow-x:auto">
+      <table id="mdt-lots-table">
+        <thead><tr>
+          <th style="width:28px;text-align:center">✓</th>
+          <th>Désignation</th>
+          <th class="r" style="width:88px">Est. basse</th>
+          <th class="r" style="width:88px">Est. haute</th>
+        </tr></thead>
+        <tbody id="mdt-lots-body"></tbody>
+      </table>
+    </div>
+    <div class="mdt-section">Conditions financières</div>
+    <div class="mdt-g2">
+      <div class="mdt-fg"><label>Frais de vente HT (%)</label><input type="number" id="mdt-frais" value="15" min="0" max="100" step="0.5"/></div>
+      <div class="mdt-fg"><label>Taux TVA (%)</label><input type="number" id="mdt-tva" value="20" min="0" max="30" step="0.5"/></div>
+    </div>
+    <div class="mdt-section">Régime TVA du vendeur</div>
+    <div class="mdt-fg">
+      <select id="mdt-regime">
+        <option value="1">1. Vendeur particulier</option>
+        <option value="2">2. Vendeur redevable de la T.V.A. française (joindre Kbis)</option>
+        <option value="3">3. Vendeur identifié à la T.V.A. dans un autre État membre de la CEE</option>
+      </select>
+    </div>
+    <div class="mdt-section">Date et lieu de signature</div>
+    <div class="mdt-g2">
+      <div class="mdt-fg"><label>Lieu</label><input type="text" id="mdt-lieu" value="Aubagne"/></div>
+      <div class="mdt-fg"><label>Date</label><input type="date" id="mdt-date-sign"/></div>
+    </div>
+    <div class="mdt-actions">
+      <button class="btn" onclick="fermerModalMandat()">Fermer</button>
+      <button class="btn" style="background:#e8f4ea;border-color:#4a9a5a;color:#2a6a3a;font-weight:600" onclick="exportMandatPDF()"><i class="ti ti-file-type-pdf" style="font-size:13px"></i> Générer le PDF</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function ouvrirModalMandat(){
+  document.getElementById('mdt-date-sign').value=new Date().toISOString().split('T')[0];
+  var personne=document.getElementById('dos-personne')?.value||'';
+  var adresse=document.getElementById('dos-adresse')?.value||'';
+  if(personne&&!document.getElementById('mdt-vendeurs').value)
+    document.getElementById('mdt-vendeurs').value=personne+(adresse?' demeurant '+adresse:'');
+  var tbody=document.getElementById('mdt-lots-body');
+  tbody.innerHTML='';
+  var lots=rows.filter(function(r){return !r.memo;});
+  if(lots.length===0){
+    tbody.innerHTML='<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:10px">Aucun bien dans l\'inventaire</td></tr>';
+  } else {
+    lots.forEach(function(r){
+      var tr=document.createElement('tr');
+      tr.innerHTML='<td style="text-align:center"><input type="checkbox" class="mdt-chk" checked data-rid="'+r.id+'"/></td>'+
+        '<td><input type="text" class="mdt-desig" data-rid="'+r.id+'" value="'+esc(r.desig||'')+'" style="width:100%"/></td>'+
+        '<td><input type="text" class="mdt-bas r" data-rid="'+r.id+'" value="'+(r.bas||'')+'" style="width:100%;text-align:right"/></td>'+
+        '<td><input type="text" class="mdt-haut r" data-rid="'+r.id+'" value="'+(r.haut||'')+'" style="width:100%;text-align:right"/></td>';
+      tbody.appendChild(tr);
+    });
+  }
+  document.getElementById('modal-mandat').classList.add('active');
+}
+function fermerModalMandat(){document.getElementById('modal-mandat').classList.remove('active');}
+document.getElementById('modal-mandat').addEventListener('click',function(e){if(e.target===this)fermerModalMandat();});
+
+function getMandatLots(){
+  var lots=[];
+  document.querySelectorAll('.mdt-chk').forEach(function(chk){
+    if(!chk.checked)return;
+    var rid=chk.dataset.rid;
+    lots.push({
+      desig:document.querySelector('.mdt-desig[data-rid="'+rid+'"]')?.value||'',
+      bas:document.querySelector('.mdt-bas[data-rid="'+rid+'"]')?.value||'',
+      haut:document.querySelector('.mdt-haut[data-rid="'+rid+'"]')?.value||''
+    });
+  });
+  return lots;
+}
+
+async function exportMandatPDF(){
+  if(!window.jspdf){
+    await new Promise(function(resolve,reject){
+      var s1=document.createElement('script');
+      s1.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s1.onload=function(){var s2=document.createElement('script');s2.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';s2.onload=resolve;s2.onerror=reject;document.head.appendChild(s2);};
+      s1.onerror=reject;document.head.appendChild(s1);
+    });
+  }
+  var jsPDF=window.jspdf.jsPDF;
+  var doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  var W=210,MG=14,CW=W-MG*2;
+  var TC1=[122,46,26],TC2=[160,74,42],TC3=[196,118,74],TC5=[245,235,228],TC6=[250,243,238];
+  var WHITE=[255,255,255],BLACK=[26,8,4],GREY=[240,232,224];
+  var h=getH();
+  var vendeurs=document.getElementById('mdt-vendeurs').value||'';
+  var fraisHT=parseFloat(document.getElementById('mdt-frais').value)||15;
+  var tauxTVA=parseFloat(document.getElementById('mdt-tva').value)||20;
+  var fraisTTC=Math.round(fraisHT*(1+tauxTVA/100)*10)/10;
+  var regimeVal=document.getElementById('mdt-regime').value;
+  var lieuSign=document.getElementById('mdt-lieu').value||'Aubagne';
+  var dateSign=fd(document.getElementById('mdt-date-sign').value);
+  var lots=getMandatLots();
+  function sf(b,sz,c){doc.setFont('helvetica',b?'bold':'normal');doc.setFontSize(sz||10);var cl=c||BLACK;doc.setTextColor(cl[0],cl[1],cl[2]);}
+  function fill(c){doc.setFillColor(c[0],c[1],c[2]);}
+  function drw(c){doc.setDrawColor(c[0],c[1],c[2]);}
+  function lw(n){doc.setLineWidth(n);}
+  function fm(n){var v=parseFloat(String(n||0).replace(/\s/g,'').replace(',','.'))||0;if(!v)return'—';var ent=Math.floor(v);var dec=Math.round((v-ent)*100).toString().padStart(2,'0');var s=ent.toString();var r='';for(var i=0;i<s.length;i++){if(i>0&&(s.length-i)%3===0)r+=' ';r+=s[i];}return r+','+dec+' €';}
+  var y=12;
+  fill(TC6);drw(TC3);lw(0.5);doc.rect(MG,y,CW,28,'FD');
+  sf(true,15,TC3);doc.text('PARCS ENCHÈRES',MG+4,y+8);
+  sf(false,8,TC2);doc.text('Opérateur de ventes volontaires',MG+4,y+13);doc.text('ZI St Mitre, RN8 — 13400 Aubagne',MG+4,y+18);doc.text('04 42 84 07 38  |  www.parcsencheres.com',MG+4,y+23);
+  sf(false,8,TC2);doc.text('Dossier : '+(h.dosNum||'—'),W-MG-4,y+8,{align:'right'});doc.text('Protégé(e) : '+(h.dosPersonne||'—'),W-MG-4,y+13,{align:'right'});doc.text(h.dosType||'',W-MG-4,y+18,{align:'right'});
+  y+=32;
+  fill(TC1);doc.rect(MG,y,CW,10,'F');sf(true,13,WHITE);doc.text('MANDAT DE VENTE',W/2,y+7,{align:'center'});y+=14;
+  sf(false,10,BLACK);var vL=doc.splitTextToSize(vendeurs,CW);doc.text(vL,MG,y);y+=vL.length*5+3;
+  var intro='Autorise PARCS ENCHÈRES, Opérateur de Ventes Volontaires sis à AUBAGNE 13400, RN8, ZI St Mître à organiser la vente aux enchères publiques des biens et objets mobiliers désignés au présent document et d\'engager les frais ci-dessous :';
+  sf(false,9.5,BLACK);var iL=doc.splitTextToSize(intro,CW);doc.text(iL,MG,y);y+=iL.length*4.8+5;
+  var totBas=0,totHaut=0;lots.forEach(function(r){totBas+=parseVal(r.bas)||0;totHaut+=parseVal(r.haut)||0;});
+  var tdata=lots.map(function(r,i){return[String(i+1),r.desig||'',fm(r.bas),fm(r.haut)];});
+  tdata.push(['','TOTAL ESTIMATIONS',fm(totBas),fm(totHaut)]);
+  doc.autoTable({startY:y,margin:{left:MG,right:MG},tableWidth:CW,
+    head:[['LOT','Désignation','Est. basse','Est. haute']],body:tdata,
+    styles:{fontSize:8,cellPadding:2.5,textColor:BLACK,lineColor:TC3,lineWidth:0.2},
+    headStyles:{fillColor:TC1,textColor:WHITE,fontStyle:'bold',fontSize:8.5},
+    alternateRowStyles:{fillColor:TC6},
+    columnStyles:{0:{cellWidth:10,halign:'center'},1:{cellWidth:'auto'},2:{cellWidth:28,halign:'right'},3:{cellWidth:28,halign:'right'}},
+    didParseCell:function(data){if(data.row.index===tdata.length-1){data.cell.styles.fontStyle='bold';data.cell.styles.fillColor=TC5;}}
+  });
+  y=doc.lastAutoTable.finalY+6;
+  if(y>240){doc.addPage();y=16;}
+  fill(TC5);drw(TC3);lw(0.3);doc.rect(MG,y,CW,8,'FD');sf(true,9,TC1);doc.text('Intitulé des frais',MG+3,y+5.5);doc.text('Taux TTC',W-MG-3,y+5.5,{align:'right'});y+=8;
+  fill(GREY);doc.rect(MG,y,CW,7,'F');sf(false,9,BLACK);doc.text('Frais de vente '+fraisHT+'% HT',MG+3,y+5);sf(true,9,BLACK);doc.text(fraisTTC+'%',W-MG-3,y+5,{align:'right'});y+=10;
+  if(y>220){doc.addPage();y=16;}
+  var cg=['Auxquels peuvent s\'ajouter :','- Le remboursement de la facture de transport et de garde-meubles','- Le droit de suite sera versé à l\'artiste ou à ses héritiers (loi du 11.03.57) ainsi que les droits de reproduction','  Taux droit de suite : 4% jusqu\'à 50 000 € | 3% de 50 000 à 200 000 € | 1% de 200 000 à 350 000 € | 0,5% de 350 000 à 500 000 € | 0,25% au-delà','- Les frais de contrôle sur les métaux précieux (10 € / article)','- Sur chaque adjudication supérieure à 5 000 € : taxe forfaitaire de 6,5% de plus-value, sauf option du régime commun d\'imposition.','- Les frais de photographie et tout autre frais de gestion de la vente'];
+  sf(false,7.5,BLACK);cg.forEach(function(l){if(y>270){doc.addPage();y=16;}var w=doc.splitTextToSize(l,CW);doc.text(w,MG,y);y+=w.length*4+1;});y+=3;
+  if(y>240){doc.addPage();y=16;}
+  fill(TC5);drw(TC3);lw(0.3);doc.rect(MG,y,CW,7,'FD');sf(true,9,TC1);doc.text('RÉGIME DE TVA DU VENDEUR',MG+3,y+5);y+=9;
+  [{id:'1',label:'Vendeur particulier'},{id:'2',label:'Vendeur redevable de la T.V.A. française au titre de la vente (merci de joindre un extrait Kbis)'},{id:'3',label:'Vendeur identifié à la T.V.A. dans un autre État membre de la C.E.E. sous le N° et s\'engage à remplir sous sa seule responsabilité les obligations fiscales en résultant.'}].forEach(function(r){
+    if(y>270){doc.addPage();y=16;}sf(false,8.5,BLACK);doc.text(r.id===regimeVal?'☑':'☐',MG+2,y);var w=doc.splitTextToSize(r.label,CW-12);doc.text(w,MG+8,y);y+=w.length*4.5+2;});y+=4;
+  if(y>240){doc.addPage();y=16;}
+  ['Règlement du produit net : 30/60 jours après la vente.','Le règlement pourra se trouver différé en cas de préemption par l\'État ou d\'achat étranger.','SAS PARCS ENCHÈRES OVV sera tenue de payer le vendeur lorsqu\'elle aura été réglée par l\'adjudicataire.','','IMPORTANT : Sans instructions particulières de votre part, ces objets seront vendus au plus offrant et dernier enchérisseur.','En application de la loi du 10/07/2000, le prix de réserve ne peut être supérieur à l\'estimation basse.','Seuls les lots dont l\'estimation basse est supérieure ou égale à 200 € pourront faire l\'objet d\'un prix de réserve. La réserve s\'entend à 10% près.','En cas d\'invendus, SAS PARCS ENCHÈRES OVV se réserve le droit de vendre les lots de gré à gré ou de les présenter à nouveau.','','Prière de nous retourner ce contrat signé avant la vente, de conserver le duplicata, et de nous envoyer impérativement une photocopie de votre pièce d\'identité (CNI ou passeport) ainsi que votre RIB.'].forEach(function(l){if(y>272){doc.addPage();y=16;}if(!l){y+=2;return;}var w=doc.splitTextToSize(l,CW);doc.text(w,MG,y);y+=w.length*4+1;});y+=6;
+  if(y>250){doc.addPage();y=16;}
+  sf(false,9,BLACK);doc.text('Fait à '+lieuSign+', le '+dateSign,MG,y);y+=8;doc.text('Date et signature des vendeurs :',MG,y);y+=16;
+  drw(TC3);lw(0.3);doc.line(MG,y,MG+80,y);sf(false,8,TC2);doc.text('Signature(s)',MG+40,y+5,{align:'center'});
+  var total=doc.internal.getNumberOfPages();
+  for(var i=1;i<=total;i++){doc.setPage(i);sf(false,7,[160,120,100]);doc.text('SAS PARCS ENCHÈRES — SAS au capital de 500 040 € — Agrément 2002-263 — N° TVA IC : FR35 407 526 334',W/2,292,{align:'center'});doc.text('Page '+i+' / '+total,W-MG,292,{align:'right'});}
+  var nom=(h.dosPersonne||'inventaire').replace(/\s+/g,'_');
+  doc.save('Mandat_Vente_'+nom+'.pdf');
+  fermerModalMandat();
+}
+</script>
+
 </body>
 </html>
