@@ -1048,16 +1048,30 @@ async function exportPDF(){
     tableWidth:CW,
     head:[['N','Désignation du bien','Emplacement','Est. basse (€)','Est. haute (€)']],
     body:tdata,
-    styles:{fontSize:8,cellPadding:2.5,textColor:BLACK,lineColor:TC4,lineWidth:0.2},
-    headStyles:{fillColor:TC1,textColor:WHITE,fontStyle:'bold',fontSize:8.5},
+    styles:{
+      fontSize:8,
+      cellPadding:2.5,
+      textColor:BLACK,
+      lineColor:TC4,
+      lineWidth:0.2,
+      overflow:'linebreak',
+      valign:'middle',
+    },
+    headStyles:{fillColor:TC1,textColor:WHITE,fontStyle:'bold',fontSize:8.5,overflow:'linebreak'},
     alternateRowStyles:{fillColor:TC6},
     columnStyles:{
       0:{cellWidth:9,halign:'center'},
-      1:{cellWidth:'auto'},
-      2:{cellWidth:26,halign:'center'},
-      3:{cellWidth:26,halign:'right'},
-      4:{cellWidth:26,halign:'right'},
+      1:{cellWidth:90,overflow:'linebreak'},
+      2:{cellWidth:26,halign:'center',overflow:'linebreak'},
+      3:{cellWidth:22,halign:'right'},
+      4:{cellWidth:22,halign:'right'},
     },
+    didParseCell: function(data){
+      // Forcer le wrapping sur la colonne description
+      if(data.column.index===1){
+        data.cell.styles.overflow='linebreak';
+      }
+    }
   });
   y=doc.lastAutoTable.finalY+5;
 
