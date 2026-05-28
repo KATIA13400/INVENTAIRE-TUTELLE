@@ -318,6 +318,129 @@ function fbSupprimer(dossierId) {
 }
 </script>
 
+
+<!-- Google Identity Services -->
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script>
+const GDRIVE_CLIENT_ID = '575590755991-sv1jvgcuv2ns7ef7lcspdq773nhok2ak.apps.googleusercontent.com';
+const GDRIVE_FOLDER_NAME = 'Inventaires Tutelle - FAGIANO';
+var gdriveAccessToken = null;
+var gdriveFolderId = null;
+
+// Initialiser Google Drive Auth
+function initGoogleDrive(){
+  google.accounts.oauth2.initTokenClient({
+    client_id: GDRIVE_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    callback: function(response){
+      if(response.access_token){
+        gdriveAccessToken = response.access_token;
+        console.log('Google Drive connecté ✅');
+        // Trouver ou créer le dossier partagé
+        getOrCreateDriveFolder().then(function(folderId){
+          gdriveFolderId = folderId;
+          console.log('Dossier Drive prêt:', folderId);
+        });
+      }
+    }
+  });
+}
+
+// Demander l'autorisation
+function demanderAccesDrive(){
+  if(!window.google){ alert('Chargement en cours, réessayez dans quelques secondes.'); return; }
+  var client = google.accounts.oauth2.initTokenClient({
+    client_id: GDRIVE_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    callback: function(response){
+      if(response.access_token){
+        gdriveAccessToken = response.access_token;
+        localStorage.setItem('gdrive_token_time', Date.now().toString());
+        getOrCreateDriveFolder().then(function(folderId){
+          gdriveFolderId = folderId;
+          alert('✅ Google Drive connecté !\nVos PDF seront sauvegardés dans :\n"' + GDRIVE_FOLDER_NAME + '"');
+          updateDriveStatus();
+        });
+      }
+    }
+  });
+  client.requestAccessToken();
+}
+
+// Trouver ou créer le dossier "Inventaires Tutelle"
+async function getOrCreateDriveFolder(){
+  // Chercher le dossier existant
+  var searchResp = await fetch(
+    'https://www.googleapis.com/drive/v3/files?q=name="' + GDRIVE_FOLDER_NAME + '" and mimeType="application/vnd.google-apps.folder" and trashed=false&fields=files(id,name)',
+    {headers: {'Authorization': 'Bearer ' + gdriveAccessToken}}
+  );
+  var searchData = await searchResp.json();
+  if(searchData.files && searchData.files.length > 0){
+    return searchData.files[0].id;
+  }
+  // Créer le dossier
+  var createResp = await fetch('https://www.googleapis.com/drive/v3/files', {
+    method: 'POST',
+    headers: {'Authorization': 'Bearer ' + gdriveAccessToken, 'Content-Type': 'application/json'},
+    body: JSON.stringify({name: GDRIVE_FOLDER_NAME, mimeType: 'application/vnd.google-apps.folder'})
+  });
+  var createData = await createResp.json();
+  return createData.id;
+}
+
+// Sauvegarder un PDF dans Google Drive
+async function sauverPDFDansGDrive(pdfBlob, fileName){
+  if(!gdriveAccessToken){
+    var ok = confirm('Pour sauvegarder dans Google Drive, vous devez vous connecter.\nVoulez-vous vous connecter maintenant ?');
+    if(ok) demanderAccesDrive();
+    return false;
+  }
+  try{
+    // S'assurer qu'on a le dossier
+    if(!gdriveFolderId){
+      gdriveFolderId = await getOrCreateDriveFolder();
+    }
+    var metadata = {
+      name: fileName,
+      parents: [gdriveFolderId]
+    };
+    var formData = new FormData();
+    formData.append('metadata', new Blob([JSON.stringify(metadata)], {type:'application/json'}));
+    formData.append('file', pdfBlob, fileName);
+    var resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      headers: {'Authorization': 'Bearer ' + gdriveAccessToken},
+      body: formData
+    });
+    var data = await resp.json();
+    if(data.id){
+      console.log('PDF sauvegardé dans Drive:', data.id);
+      return true;
+    }
+    return false;
+  } catch(e){
+    console.error('Erreur Drive:', e);
+    return false;
+  }
+}
+
+function updateDriveStatus(){
+  var btn = document.getElementById('btn-drive-connect');
+  if(!btn) return;
+  if(gdriveAccessToken){
+    btn.textContent = '☁️ Drive connecté';
+    btn.style.background = '#e8f4ea';
+    btn.style.color = '#2a6a3a';
+    btn.style.borderColor = '#4a9a5a';
+  } else {
+    btn.textContent = '☁️ Connecter Drive';
+    btn.style.background = '';
+    btn.style.color = '';
+    btn.style.borderColor = '';
+  }
+}
+</script>
+
 </head>
 <body>
 <div id="autosave-indicator" class="hidden">
@@ -387,6 +510,7 @@ function fbSupprimer(dossierId) {
     <div class="dossier-actions">
       <button class="btn terra" onclick="ouvrirModalNouveauDossier()"><i class="ti ti-plus" style="font-size:13px"></i> Nouvel inventaire</button>
       <button class="btn" onclick="toggleListeDossiers()" id="btn-toggle-liste"><i class="ti ti-list" style="font-size:13px"></i> Tous les dossiers</button>
+
     </div>
   </div>
   <div id="liste-dossiers" style="display:none">
@@ -484,7 +608,13 @@ function fbSupprimer(dossierId) {
 <div id="dossier-zone">
 <!-- EN-TÊTE DOSSIER -->
 <div class="card">
-  <div class="section-label"><i class="ti ti-file-description" style="font-size:14px"></i>Dossier en cours</div>
+  <div class="section-label" style="justify-content:space-between">
+    <span><i class="ti ti-file-description" style="font-size:14px"></i>Dossier en cours</span>
+    <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;cursor:pointer;color:var(--tc1);text-transform:none;letter-spacing:0">
+      <input type="checkbox" id="dos-termine" onchange="toggleDossierTermine(this.checked)" style="width:14px;height:14px;cursor:pointer;accent-color:var(--tc1)"/>
+      ✓ Dossier terminé
+    </label>
+  </div>
   <div class="grid3">
     <div class="fg"><label>N° d'inventaire</label><input id="dos-num" placeholder="À compléter"/></div>
     <div class="fg"><label>Type de procédure</label>
@@ -613,6 +743,7 @@ function fbSupprimer(dossierId) {
   <button class="btn primary" onclick="toggleMentionAbandon()" id="btn-abandon"><i class="ti ti-alert-triangle" style="font-size:13px"></i> Mention abandon</button>
   <button class="btn primary" onclick="toggleMentionBijoux()" id="btn-bijoux"><i class="ti ti-diamond" style="font-size:13px"></i> Mention bijoux</button>
   <span id="fb-status" style="font-size:11px;color:#2a6a3a;margin-right:8px">🔴 Hors ligne</span><button class="btn" onclick="annuler()" title="Annuler la dernière action (Ctrl+Z)"><i class="ti ti-arrow-back-up" style="font-size:13px"></i> Annuler</button>
+      <button class="btn" id="btn-drive-connect" onclick="demanderAccesDrive()" title="Connecter Google Drive pour sauvegarder les PDF">☁️ Connecter Drive</button>
       <button class="btn" style="background:#e8f4ea;border-color:#4a9a5a;color:#2a6a3a;font-weight:600" onclick="ouvrirModalMandat()"><i class="ti ti-gavel" style="font-size:13px"></i> Mandat de Vente</button>
       
   <button class="btn" onclick="loadLocal()"><i class="ti ti-folders" style="font-size:13px"></i> Mes dossiers</button>
@@ -1017,7 +1148,33 @@ async function exportPDF(){
     doc.text('Page '+i+' / '+total,W-MG,292,{align:'right'});
   }
 
-  doc.save('PV_Inventaire_'+(h.dosPersonne||'CHEYLAN')+'_'+(h.dosNum||'')+'.pdf');
+  var pdfFileName = 'PV_Inventaire_'+(h.dosPersonne||'CHEYLAN')+'_'+(h.dosNum||'')+'.pdf';
+  // Téléchargement local
+  var pdfBlob = doc.output('blob');
+  var pdfUrl = URL.createObjectURL(pdfBlob);
+  var pdfLink = document.createElement('a');
+  pdfLink.href=pdfUrl; pdfLink.download=pdfFileName;
+  document.body.appendChild(pdfLink); pdfLink.click();
+  document.body.removeChild(pdfLink);
+  URL.revokeObjectURL(pdfUrl);
+  // Proposition Google Drive
+  if(gdriveAccessToken){
+    setTimeout(function(){
+      var saveDrive=confirm('PDF téléchargé !\n\nVoulez-vous aussi le sauvegarder dans Google Drive ?\n(Dossier : "Inventaires Tutelle - FAGIANO")');
+      if(saveDrive){
+        var blob2=doc.output('blob');
+        sauverPDFDansGDrive(blob2,pdfFileName).then(function(ok){
+          if(ok) alert('✅ PDF sauvegardé dans Google Drive !');
+          else alert('❌ Erreur Drive. Vérifiez votre connexion.');
+        });
+      }
+    },300);
+  } else {
+    setTimeout(function(){
+      var connect=confirm('💡 Connectez Google Drive pour sauvegarder vos PDF automatiquement !\n\nVoulez-vous connecter Google Drive maintenant ?');
+      if(connect) demanderAccesDrive();
+    },500);
+  }
   }catch(err){alert('Erreur PDF : '+err.message);console.error(err);}
 }
 
@@ -1546,7 +1703,7 @@ function handleOrdFile(file){if(!file)return;const apiKey=getApiKey();if(!apiKey
 async function extractOrd(b64,apiKey){
   setOrdStatus('loading','Analyse par l IA…');
   try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1000,messages:[{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:'Extrais les informations de ce jugement en JSON : {"dosType":"TUTELLE|CURATELLE|SUCCESSION|SAUVEGARDE DE JUSTICE|AUTRE","dosPersonne":"civilité prénom NOM","dosAdresse":"adresse domicile","mandNom":"prénom NOM mandataire","mandOrg":"organisation","mandAdresse":"adresse mandataire","mandTribunal":"Tribunal compétent","mandJugement":"JJ/MM/AAAA","mandVille":"ville tribunal"}'}]}]})});
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1000,system:'Tu es un extracteur de données juridiques. Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans markdown, sans explication.',messages:[{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:'Extrais les informations de ce jugement. Réponds UNIQUEMENT avec ce JSON (rien d\'autre) : {"dosType":"TUTELLE ou CURATELLE ou SUCCESSION ou SAUVEGARDE DE JUSTICE ou HABILITATION FAMILIALE ou AUTRE","dosPersonne":"civilité prénom NOM du protégé","dosAdresse":"adresse domicile du protégé","mandNom":"prénom NOM du mandataire","mandOrg":"organisation du mandataire","mandAdresse":"adresse du mandataire","mandTribunal":"Tribunal compétent","mandJugement":"date jugement JJ/MM/AAAA","mandVille":"ville du tribunal"}'}]}]})});
     const data=await resp.json();if(data.error)throw new Error(data.error.message);
     const parsed=JSON.parse(data.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim());
     const map={dosType:'dos-type',dosPersonne:'dos-personne',dosAdresse:'dos-adresse',mandNom:'mand-nom',mandOrg:'mand-org',mandAdresse:'mand-adresse',mandTribunal:'mand-tribunal',mandVille:'mand-ville'};
@@ -1625,7 +1782,8 @@ function renderListeDossiers(){
       html+='<div class="dossier-card'+(isActive?' active':'')+' " onclick="ouvrirDossier(\''+ d.id +'\')">';
       html+='<button class="dc-del" onclick="event.stopPropagation();supprimerDossier(\''+ d.id +'\')" title="Supprimer"><i class="ti ti-trash"></i></button>';
       var numLabel = (d.h&&d.h.dosNum) ? '<span style="font-size:10px;font-weight:700;color:var(--tc2);margin-right:5px">'+(d.h.dosNum)+'</span>' : '';
-      html+='<div class="dc-nom" title="'+(d.nom||'')+'">'+numLabel+(d.nom||'Sans nom')+'</div>';
+      var termineLabel = d.termine ? '<span style="font-size:9px;background:#2a6a3a;color:#fff;border-radius:4px;padding:1px 5px;margin-left:4px">✓ Terminé</span>' : '';
+      html+='<div class="dc-nom" title="'+(d.nom||'')+'">'+numLabel+(d.nom||'Sans nom')+termineLabel+'</div>';
       html+='<div class="dc-info">'+(d.type||'')+' · '+nbBiens+' bien(s)</div>';
       html+='<div class="dc-info" style="color:var(--text3)">'+dateCreation+'</div>';
       if(isActive)html+='<div style="margin-top:4px;font-size:10px;color:var(--tc2);font-weight:600">✓ EN COURS</div>';
@@ -1729,6 +1887,13 @@ function ouvrirDossier(id){
   renderRows();  // Un seul appel pour toutes les lignes
   updateTotals();
   renderGallery();
+  // Charger les photos depuis Firebase
+  fbChargerPhotos(id, function(loaded){
+    rowPhotos = loaded;
+    renderRows();
+    syncRowPhotosToGallery();
+  });
+  updateTermineCheckbox();
   
   // Mettre à jour le badge
   const badge=document.getElementById('badge-dossier-actif');
@@ -1971,15 +2136,19 @@ function mrpHandleFiles(files){
     reader.onload = function(ev){
       compressImage(ev.target.result, 800, 0.65, function(compressed){
         if(!rowPhotos[_mrpCurrentRowId]) rowPhotos[_mrpCurrentRowId]=[];
+        var photoId = Date.now() + Math.random();
+        var photoLabel = file.name.replace(/\.[^.]+$/,'');
         rowPhotos[_mrpCurrentRowId].push({
-          id: Date.now()+Math.random(),
+          id: photoId,
           src: compressed,
-          label: file.name.replace(/\.[^.]+$/,'')
+          label: photoLabel
         });
         mrpRenderGrid();
-        // Mettre à jour aussi la galerie principale
-        // (on synchronise les photos de ligne dans la galerie globale)
         syncRowPhotosToGallery();
+        // Sauver dans Firebase
+        if(currentDossierId){
+          fbSauverPhoto(currentDossierId, _mrpCurrentRowId, photoId, compressed, photoLabel);
+        }
       });
     };
     reader.readAsDataURL(file);
@@ -1993,6 +2162,8 @@ function mrpDeletePhoto(rowId, photoId){
   rowPhotos[rowId] = rowPhotos[rowId].filter(function(p){return p.id!==photoId;});
   mrpRenderGrid();
   syncRowPhotosToGallery();
+  // Supprimer de Firebase
+  if(currentDossierId) fbSupprimerPhoto(currentDossierId, rowId, photoId);
 }
 
 function mrpRenderGrid(){
@@ -2025,6 +2196,231 @@ function syncRowPhotosToGallery(){
   });
   photos = orphans.concat(fromRows);
   renderGallery();
+}
+</script>
+
+
+<script>
+// ── EXPORT TOUS LES DOSSIERS ─────────────────────────────────────────────
+function exporterTousDossiers(){
+  // Sauvegarder d'abord le dossier en cours
+  if(currentDossierId) sauverDossierEnCours();
+
+  var data = {
+    version: 1,
+    exportDate: new Date().toISOString(),
+    dossiers: {}
+  };
+
+  Object.keys(allDossiers).forEach(function(id){
+    var d = allDossiers[id];
+    data.dossiers[id] = {
+      id: d.id,
+      nom: d.nom,
+      annee: d.annee,
+      type: d.type,
+      dateCreation: d.dateCreation,
+      dateMaj: d.dateMaj,
+      h: d.h || {},
+      rows: (d.rows || []).map(function(r){
+        return {id:r.id, desig:r.desig||'', lieu:r.lieu||'', bas:r.bas||'', haut:r.haut||'', memo:r.memo||false};
+      })
+    };
+  });
+
+  var json = JSON.stringify(data, null, 2);
+  var blob = new Blob([json], {type:'application/json'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = 'inventaires_fagiano_' + new Date().toISOString().slice(0,10) + '.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  var nb = Object.keys(data.dossiers).length;
+  alert(nb + ' dossier(s) exporté(s) avec succès !');
+}
+
+// ── IMPORT DOSSIERS ────────────────────────────────────────────────────────
+function importerDossiers(input){
+  var file = input.files[0];
+  if(!file) return;
+
+  var reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      var data = JSON.parse(e.target.result);
+      if(!data.dossiers){ alert('Fichier invalide — pas de dossiers trouvés.'); return; }
+
+      var count = 0;
+      var doublons = 0;
+
+      Object.keys(data.dossiers).forEach(function(id){
+        var d = data.dossiers[id];
+        if(allDossiers[id]){
+          // Dossier existant : demander si on écrase
+          doublons++;
+        } else {
+          allDossiers[id] = d;
+          // Sauver dans Firebase
+          fbSauver(id, d);
+          count++;
+        }
+      });
+
+      if(doublons > 0){
+        var ok = confirm(doublons + ' dossier(s) existent déjà.
+Voulez-vous les remplacer par la version importée ?');
+        if(ok){
+          Object.keys(data.dossiers).forEach(function(id){
+            var d = data.dossiers[id];
+            if(allDossiers[id]){
+              allDossiers[id] = d;
+              fbSauver(id, d);
+              count++;
+            }
+          });
+        }
+      }
+
+      sauverTousDossiers();
+      renderListeDossiers();
+
+      // Ouvrir la liste
+      document.getElementById('liste-dossiers').style.display='block';
+      document.getElementById('btn-toggle-liste').innerHTML='<i class="ti ti-chevron-up" style="font-size:13px"></i> Masquer';
+
+      alert(count + ' dossier(s) importé(s) avec succès !\nIls sont maintenant synchronisés avec Firebase.');
+
+    } catch(err){
+      alert('Erreur lors de la lecture du fichier : ' + err.message);
+    }
+    // Reset input
+    input.value = '';
+  };
+  reader.readAsText(file);
+}
+</script>
+
+
+<script>
+// ── PHOTOS PERSISTANTES VIA FIREBASE ─────────────────────────────────────
+
+// Compresser une image avant stockage
+function compressImageForFirebase(dataUrl, callback){
+  var img = new Image();
+  img.onload = function(){
+    var canvas = document.createElement('canvas');
+    var MAX = 800;
+    var w = img.width, h = img.height;
+    if(w > MAX){ h = Math.round(h * MAX / w); w = MAX; }
+    if(h > MAX){ w = Math.round(w * MAX / h); h = MAX; }
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, w, h);
+    callback(canvas.toDataURL('image/jpeg', 0.5));
+  };
+  img.src = dataUrl;
+}
+
+// Sauver UNE photo dans Firebase
+function fbSauverPhoto(dossierId, rowId, photoId, src, label){
+  if(!dossierId) return;
+  var key = 'photos/' + dossierId + '/' + rowId + '/' + photoId;
+  // Compresser d'abord
+  compressImageForFirebase(src, function(compressed){
+    fbdb.ref(key).set({
+      id: photoId,
+      rowId: rowId,
+      src: compressed,
+      label: label || '',
+      date: Date.now()
+    }).catch(function(e){ console.warn('Photo Firebase erreur:', e); });
+  });
+}
+
+// Supprimer UNE photo de Firebase
+function fbSupprimerPhoto(dossierId, rowId, photoId){
+  if(!dossierId) return;
+  fbdb.ref('photos/' + dossierId + '/' + rowId + '/' + photoId).remove()
+    .catch(function(e){ console.warn('Suppression photo erreur:', e); });
+}
+
+// Supprimer TOUTES les photos d'un dossier de Firebase
+function fbSupprimerPhotoDossier(dossierId){
+  if(!dossierId) return;
+  fbdb.ref('photos/' + dossierId).remove()
+    .catch(function(e){ console.warn('Suppression photos dossier erreur:', e); });
+}
+
+// Charger les photos d'un dossier depuis Firebase
+function fbChargerPhotos(dossierId, callback){
+  if(!dossierId){ if(callback) callback({}); return; }
+  fbdb.ref('photos/' + dossierId).once('value', function(snap){
+    var data = snap.val() || {};
+    // Reconstruire rowPhotos depuis Firebase
+    var loaded = {};
+    Object.keys(data).forEach(function(rowId){
+      var rowData = data[rowId];
+      loaded[rowId] = [];
+      Object.keys(rowData).forEach(function(photoId){
+        var p = rowData[photoId];
+        loaded[rowId].push({id: p.id, src: p.src, label: p.label||''});
+      });
+    });
+    if(callback) callback(loaded);
+  }).catch(function(e){
+    console.warn('Chargement photos erreur:', e);
+    if(callback) callback({});
+  });
+}
+</script>
+
+
+<script>
+// ── DOSSIER TERMINÉ ───────────────────────────────────────────────────────
+function toggleDossierTermine(checked){
+  if(!currentDossierId) return;
+
+  if(checked){
+    var ok = confirm('Marquer ce dossier comme TERMINÉ ?\n\nLes photos seront supprimées du serveur pour libérer de l\'espace.\n(Les données texte et estimations sont conservées.)');
+    if(!ok){
+      document.getElementById('dos-termine').checked = false;
+      return;
+    }
+    // Marquer comme terminé dans allDossiers
+    if(allDossiers[currentDossierId]){
+      allDossiers[currentDossierId].termine = true;
+    }
+    // Supprimer les photos de Firebase
+    fbSupprimerPhotoDossier(currentDossierId);
+    // Vider rowPhotos localement
+    rowPhotos = {};
+    syncRowPhotosToGallery();
+    renderRows();
+    // Sauver
+    sauverDossierEnCours();
+    // Mettre à jour la carte dans la liste
+    renderListeDossiers();
+    alert('Dossier marqué comme terminé. Photos supprimées du serveur.');
+  } else {
+    // Rouvrir le dossier
+    if(allDossiers[currentDossierId]){
+      allDossiers[currentDossierId].termine = false;
+    }
+    sauverDossierEnCours();
+    renderListeDossiers();
+  }
+}
+
+// Mettre à jour la case à cocher quand on ouvre un dossier
+function updateTermineCheckbox(){
+  var chk = document.getElementById('dos-termine');
+  if(!chk) return;
+  var d = allDossiers[currentDossierId];
+  chk.checked = d && d.termine ? true : false;
 }
 </script>
 
