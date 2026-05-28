@@ -1048,6 +1048,7 @@ async function exportPDF(){
     tableWidth:CW,
     head:[['N','Désignation du bien','Emplacement','Est. basse (€)','Est. haute (€)']],
     body:tdata,
+    rowPageBreak:'avoid',
     styles:{
       fontSize:8,
       cellPadding:2.5,
@@ -1055,21 +1056,23 @@ async function exportPDF(){
       lineColor:TC4,
       lineWidth:0.2,
       overflow:'linebreak',
-      valign:'middle',
+      valign:'top',
+      minCellHeight:0,
     },
-    headStyles:{fillColor:TC1,textColor:WHITE,fontStyle:'bold',fontSize:8.5,overflow:'linebreak'},
+    headStyles:{fillColor:TC1,textColor:WHITE,fontStyle:'bold',fontSize:8.5,overflow:'linebreak',valign:'middle'},
     alternateRowStyles:{fillColor:TC6},
     columnStyles:{
-      0:{cellWidth:9,halign:'center'},
-      1:{cellWidth:90,overflow:'linebreak'},
-      2:{cellWidth:26,halign:'center',overflow:'linebreak'},
-      3:{cellWidth:22,halign:'right'},
-      4:{cellWidth:22,halign:'right'},
+      0:{cellWidth:9,halign:'center',valign:'top'},
+      1:{cellWidth:90,overflow:'linebreak',valign:'top'},
+      2:{cellWidth:26,halign:'center',overflow:'linebreak',valign:'top'},
+      3:{cellWidth:22,halign:'right',valign:'top'},
+      4:{cellWidth:22,halign:'right',valign:'top'},
     },
     didParseCell: function(data){
       // Forcer le wrapping sur la colonne description
       if(data.column.index===1){
         data.cell.styles.overflow='linebreak';
+        data.cell.styles.valign='top';
       }
     }
   });
