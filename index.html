@@ -1533,7 +1533,7 @@ function handlePhotoFiles(files){
     reader.onload=ev=>{
       // Compresser à max 800px et qualité 0.6 pour économiser l'espace
       compressImage(ev.target.result, 600, 0.5, compressed=>{
-        photos.push({id:Date.now()+Math.random(),src:compressed,lineNum:0});
+        photos.push({id:Date.now()+"_"+Math.floor(Math.random()*100000),src:compressed,lineNum:0});
         renderGallery();
       });
     };
@@ -1671,7 +1671,7 @@ function injecterDansLigne(){
   if(expImages.length>0){
     if(!rowPhotos[r.id])rowPhotos[r.id]=[];
     expImages.forEach(function(img){
-      rowPhotos[r.id].push({id:Date.now()+Math.random(),src:'data:image/jpeg;base64,'+img.b64.split(',')[1],label:img.label||'Photo expertise'});
+      rowPhotos[r.id].push({id:Date.now()+"_"+Math.floor(Math.random()*100000),src:'data:image/jpeg;base64,'+img.b64.split(',')[1],label:img.label||'Photo expertise'});
     });
     syncRowPhotosToGallery();
   }
@@ -1704,7 +1704,7 @@ function ajouterCommeNouvelleLigne(){
   if(expImages.length>0){
     rowPhotos[newId]=[];
     expImages.forEach(function(img){
-      rowPhotos[newId].push({id:Date.now()+Math.random(),src:'data:image/jpeg;base64,'+img.b64.split(',')[1],label:img.label||'Photo expertise'});
+      rowPhotos[newId].push({id:Date.now()+"_"+Math.floor(Math.random()*100000),src:'data:image/jpeg;base64,'+img.b64.split(',')[1],label:img.label||'Photo expertise'});
     });
     syncRowPhotosToGallery();
   }
@@ -2152,7 +2152,7 @@ function mrpHandleFiles(files){
     reader.onload = function(ev){
       compressImage(ev.target.result, 800, 0.65, function(compressed){
         if(!rowPhotos[_mrpCurrentRowId]) rowPhotos[_mrpCurrentRowId]=[];
-        var photoId = Date.now() + Math.random();
+        var photoId = Date.now() + "_" + Math.floor(Math.random()*100000);
         var photoLabel = file.name.replace(/\.[^.]+$/,'');
         rowPhotos[_mrpCurrentRowId].push({
           id: photoId,
