@@ -1079,14 +1079,13 @@ async function exportPDF(){
   y=doc.lastAutoTable.finalY+5;
 
   // ── TOTAL ────────────────────────────────────────────────────────────────
+  // Colonnes : 0=9 | 1=90 | 2=26 | 3=22 | 4=22  → total=CW
+  // Col Est.basse bord droit : MG+CW-22  /  Col Est.haute bord droit : MG+CW
   fill(TC1);doc.rect(MG,y,CW,8,'F');
   sf(true,9.5,WHITE);
   doc.text('TOTAL',MG+3,y+5.5);
-  // Aligner exactement sous les colonnes Est.basse et Est.haute du autoTable
-  // col basse : largeur 26mm, finit à CW-26
-  // col haute : largeur 26mm, finit à CW
-  doc.text(fm(totBas)+' €',MG+CW-26,y+5.5,{align:'right'});
-  doc.text(fm(totHaut)+' €',MG+CW,y+5.5,{align:'right'});
+  doc.text(fm(totBas)+' €',MG+CW-22,y+5.5,{align:'right'});
+  doc.text(fm(totHaut)+' €',MG+CW-1,y+5.5,{align:'right'});
   y+=13;
 
   // ── ETAT RECAPITULATIF ───────────────────────────────────────────────────
