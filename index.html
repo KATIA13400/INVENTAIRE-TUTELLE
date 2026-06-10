@@ -467,19 +467,44 @@ function updateDriveStatus(){
     <div id="login-title">M<sup style="font-size:11px;font-family:Georgia,serif">e</sup> FAGIANO Katia</div>
     <div id="login-sub">SELARLU</div>
     <div id="login-sep"></div>
-    <label id="login-label" for="login-input">Mot de passe</label>
+    <label id="login-label" for="login-email" style="text-align:left;display:block;margin-bottom:4px;">Email</label>
+    <input type="email" id="login-email" placeholder="votre@email.com" autocomplete="email" style="font-family:inherit;font-size:14px;border:1px solid var(--border);border-radius:8px;padding:10px 14px;background:var(--bg3);color:var(--text);width:100%;box-sizing:border-box;margin-bottom:10px;letter-spacing:0;" onkeydown="if(event.key==='Enter')document.getElementById('login-input').focus()" />
+    <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-bottom:8px;display:block;text-align:left;">Mot de passe</label>
     <input type="password" id="login-input" placeholder="••••••••" autocomplete="current-password" onkeydown="if(event.key==='Enter')checkLogin()" />
     <button id="login-btn" onclick="checkLogin()">Accéder à l'application</button>
-    <div id="login-err">Mot de passe incorrect. Réessayez.</div>
+    <div id="login-err">Email ou mot de passe incorrect.</div>
     <div id="login-footer">COMMISSAIRE DE JUSTICE · COMMISSAIRE-PRISEUR JUDICIAIRE</div>
   </div>
 </div>
 <script>
 (function(){
-  var PWD="Fagiano2026!";var KEY="fagiano_auth_v1";
-  function checkLogin(){var val=document.getElementById("login-input").value;if(val===PWD){sessionStorage.setItem(KEY,"1");document.getElementById("login-overlay").style.display="none";document.getElementById("login-err").style.display="none";}else{document.getElementById("login-err").style.display="block";document.getElementById("login-input").value="";document.getElementById("login-input").focus();}}
+  function checkLogin(){
+    var email=document.getElementById("login-email").value.trim();
+    var pwd=document.getElementById("login-input").value;
+    if(!email||!pwd){document.getElementById("login-err").style.display="block";document.getElementById("login-err").textContent="Veuillez saisir votre email et mot de passe.";return;}
+    var btn=document.getElementById("login-btn");
+    btn.textContent="Connexion...";btn.disabled=true;
+    document.getElementById("login-err").style.display="none";
+    firebase.auth().signInWithEmailAndPassword(email,pwd)
+      .then(function(){btn.textContent="Accéder à l'application";btn.disabled=false;})
+      .catch(function(e){
+        document.getElementById("login-err").style.display="block";
+        document.getElementById("login-err").textContent="Email ou mot de passe incorrect.";
+        document.getElementById("login-input").value="";
+        document.getElementById("login-input").focus();
+        btn.textContent="Accéder à l'application";btn.disabled=false;
+      });
+  }
   window.checkLogin=checkLogin;
-  if(sessionStorage.getItem(KEY)==="1"){document.getElementById("login-overlay").style.display="none";}
+  // Surveillance état connexion Firebase
+  firebase.auth().onAuthStateChanged(function(user){
+    var overlay=document.getElementById("login-overlay");
+    if(user){
+      if(overlay) overlay.style.display="none";
+    } else {
+      if(overlay){overlay.style.display="flex";}
+    }
+  });
 })();
 </script>
 
@@ -742,7 +767,7 @@ function updateDriveStatus(){
   <button class="btn" onclick="clearDossier()"><i class="ti ti-refresh" style="font-size:13px"></i> Nouveau dossier</button>
   <button class="btn primary" onclick="toggleMentionAbandon()" id="btn-abandon"><i class="ti ti-alert-triangle" style="font-size:13px"></i> Mention abandon</button>
   <button class="btn primary" onclick="toggleMentionBijoux()" id="btn-bijoux"><i class="ti ti-diamond" style="font-size:13px"></i> Mention bijoux</button>
-  <span id="fb-status" style="font-size:11px;color:#2a6a3a;margin-right:8px">🔴 Hors ligne</span><button class="btn" onclick="annuler()" title="Annuler la dernière action (Ctrl+Z)"><i class="ti ti-arrow-back-up" style="font-size:13px"></i> Annuler</button>
+  <span id="fb-status" style="font-size:11px;color:#2a6a3a;margin-right:8px">🔴 Hors ligne</span><button class="btn" onclick="firebase.auth().signOut()" title="Se déconnecter" style="font-size:11px;padding:3px 8px;margin-right:4px;background:var(--bg3);color:var(--text2);border:1px solid var(--border);">🔓 Déco.</button><button class="btn" onclick="annuler()" title="Annuler la dernière action (Ctrl+Z)"><i class="ti ti-arrow-back-up" style="font-size:13px"></i> Annuler</button>
       <button class="btn" id="btn-drive-connect" onclick="demanderAccesDrive()" title="Connecter Google Drive pour sauvegarder les PDF">☁️ Connecter Drive</button>
       <button class="btn" style="background:#e8f4ea;border-color:#4a9a5a;color:#2a6a3a;font-weight:600" onclick="ouvrirModalMandat()"><i class="ti ti-gavel" style="font-size:13px"></i> Mandat de Vente</button>
       
