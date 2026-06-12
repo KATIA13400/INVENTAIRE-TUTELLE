@@ -2241,7 +2241,7 @@ function mrpRenderGrid(){
   grid.innerHTML = list.map(function(p){
     return '<div class="mrp-card">'+
       '<img src="'+p.src+'" alt="photo" onclick="openZoom('+photos.findIndex(function(x){return x.id===p.id;})+')"/>'+
-      '<button class="mrp-del" onclick="mrpDeletePhoto('+rid+','+p.id+')">×</button>'+
+      '<button class="mrp-del" onclick="mrpDeletePhoto(\''+rid+'\',\''+p.id+'\')">×</button>'+
       '<div class="mrp-lbl">'+p.label+'</div>'+
       '</div>';
   }).join('');
