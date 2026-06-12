@@ -220,13 +220,7 @@ td textarea{overflow:hidden;line-height:1.5;min-height:28px}
 <script>
 // ── Configuration Firebase ────────────────────────────────────────────────
 const firebaseConfig = {
-  apiKey: "AIzaSyD3w2Dp65UNdFsUn5wvJXm9RXIKbrWM_yo",
-  authDomain: "appli-tutelles.firebaseapp.com",
-  databaseURL: "https://appli-tutelles-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "appli-tutelles",
-  storageBucket: "appli-tutelles.firebasestorage.app",
-  messagingSenderId: "9455051066",
-  appId: "1:9455051066:web:700db2ef2c962ff0693003"
+  databaseURL: "https://appli-tutelles-default-rtdb.europe-west1.firebasedatabase.app"
 };
 firebase.initializeApp(firebaseConfig);
 const fbdb = firebase.database();
@@ -353,7 +347,6 @@ function initGoogleDrive(){
   });
 }
 
-// Demander l'autorisation
 function demanderAccesDrive(){
   if(!window.google){ alert('Chargement en cours, réessayez dans quelques secondes.'); return; }
   var client = google.accounts.oauth2.initTokenClient({
@@ -362,11 +355,22 @@ function demanderAccesDrive(){
     callback: function(response){
       if(response.access_token){
         gdriveAccessToken = response.access_token;
+        _drivePhotosFolderId = null; // Réinitialiser pour recréer si besoin
         localStorage.setItem('gdrive_token_time', Date.now().toString());
         getOrCreateDriveFolder().then(function(folderId){
           gdriveFolderId = folderId;
-          alert('✅ Google Drive connecté !\nVos PDF seront sauvegardés dans :\n"' + GDRIVE_FOLDER_NAME + '"');
           updateDriveStatus();
+          // Supprimer le toast de reconnexion si présent
+          var toast = document.getElementById('drive-reconnect-toast');
+          if(toast) toast.remove();
+          // Relancer la sync des photos du dossier actif
+          if(currentDossierId){
+            fbChargerPhotos(currentDossierId, function(loaded){
+              rowPhotos = loaded;
+              renderRows();
+              syncRowPhotosToGallery();
+            });
+          }
         });
       }
     }
@@ -1935,7 +1939,7 @@ function ouvrirDossier(id){
   renderRows();  // Un seul appel pour toutes les lignes
   updateTotals();
   renderGallery();
-  // Charger les photos depuis Firebase
+  // Charger les photos depuis Drive/cache IDB
   fbChargerPhotos(id, function(loaded){
     rowPhotos = loaded;
     renderRows();
@@ -2193,16 +2197,32 @@ function mrpHandleFiles(files){
         });
         mrpRenderGrid();
         syncRowPhotosToGallery();
-        // Sauver dans Firebase
+        // Sauver dans Drive + cache IDB
         if(currentDossierId){
           fbSauverPhoto(currentDossierId, _mrpCurrentRowId, photoId, compressed, photoLabel);
         }
+        // Indicateur visuel de sauvegarde
+        showPhotoSaveIndicator();
       });
     };
     reader.readAsDataURL(file);
   });
   // Reset input
   document.getElementById('mrp-file-input').value='';
+}
+
+function showPhotoSaveIndicator(){
+  var ind = document.getElementById('photo-save-ind');
+  if(!ind){
+    ind = document.createElement('div');
+    ind.id = 'photo-save-ind';
+    ind.style.cssText = 'position:fixed;bottom:20px;right:20px;background:#2a6a3a;color:#fff;padding:8px 14px;border-radius:8px;z-index:99999;font-size:12px;transition:opacity .5s;';
+    document.body.appendChild(ind);
+  }
+  ind.textContent = '📸 Photo sauvegardée' + (gdriveAccessToken ? ' sur Drive' : ' en cache local');
+  ind.style.opacity = '1';
+  clearTimeout(ind._timer);
+  ind._timer = setTimeout(function(){ ind.style.opacity='0'; }, 2500);
 }
 
 function mrpDeletePhoto(rowId, photoId){
@@ -2357,72 +2377,355 @@ Voulez-vous les remplacer par la version importée ?');
 // ── PHOTOS PERSISTANTES VIA FIREBASE ─────────────────────────────────────
 
 // Compresser une image avant stockage
-function compressImageForFirebase(dataUrl, callback){
-  var img = new Image();
-  img.onload = function(){
-    var canvas = document.createElement('canvas');
-    var MAX = 800;
-    var w = img.width, h = img.height;
-    if(w > MAX){ h = Math.round(h * MAX / w); w = MAX; }
-    if(h > MAX){ w = Math.round(w * MAX / h); h = MAX; }
-    canvas.width = w; canvas.height = h;
-    var ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0, w, h);
-    callback(canvas.toDataURL('image/jpeg', 0.5));
-  };
-  img.src = dataUrl;
-}
+// Sauver UNE photo dans Drive + IDB
+// ═══════════════════════════════════════════════════════════════════════════
+// ── STOCKAGE PHOTOS : GOOGLE DRIVE + CACHE INDEXEDDB ─────────────────────
+// ═══════════════════════════════════════════════════════════════════════════
 
-// Sauver UNE photo dans Firebase
-function fbSauverPhoto(dossierId, rowId, photoId, src, label){
-  if(!dossierId) return;
-  var key = 'photos/' + dossierId + '/' + rowId + '/' + photoId;
-  // Compresser d'abord
-  compressImageForFirebase(src, function(compressed){
-    fbdb.ref(key).set({
-      id: photoId,
-      rowId: rowId,
-      src: compressed,
-      label: label || '',
-      date: Date.now()
-    }).catch(function(e){ console.warn('Photo Firebase erreur:', e); });
+// ── IndexedDB (cache local offline) ───────────────────────────────────────
+var _idb = null;
+function idbOpen(){
+  return new Promise(function(resolve, reject){
+    if(_idb){ resolve(_idb); return; }
+    var req = indexedDB.open('InventairePhotos', 1);
+    req.onupgradeneeded = function(e){
+      var db = e.target.result;
+      if(!db.objectStoreNames.contains('photos')){
+        db.createObjectStore('photos', {keyPath:'key'});
+      }
+    };
+    req.onsuccess = function(e){ _idb = e.target.result; resolve(_idb); };
+    req.onerror = function(){ reject(req.error); };
   });
 }
-
-// Supprimer UNE photo de Firebase
-function fbSupprimerPhoto(dossierId, rowId, photoId){
-  if(!dossierId) return;
-  fbdb.ref('photos/' + dossierId + '/' + rowId + '/' + photoId).remove()
-    .catch(function(e){ console.warn('Suppression photo erreur:', e); });
-}
-
-// Supprimer TOUTES les photos d'un dossier de Firebase
-function fbSupprimerPhotoDossier(dossierId){
-  if(!dossierId) return;
-  fbdb.ref('photos/' + dossierId).remove()
-    .catch(function(e){ console.warn('Suppression photos dossier erreur:', e); });
-}
-
-// Charger les photos d'un dossier depuis Firebase
-function fbChargerPhotos(dossierId, callback){
-  if(!dossierId){ if(callback) callback({}); return; }
-  fbdb.ref('photos/' + dossierId).once('value', function(snap){
-    var data = snap.val() || {};
-    // Reconstruire rowPhotos depuis Firebase
-    var loaded = {};
-    Object.keys(data).forEach(function(rowId){
-      var rowData = data[rowId];
-      loaded[rowId] = [];
-      Object.keys(rowData).forEach(function(photoId){
-        var p = rowData[photoId];
-        loaded[rowId].push({id: p.id, src: p.src, label: p.label||''});
-      });
+function idbSet(key, value){
+  return idbOpen().then(function(db){
+    return new Promise(function(resolve, reject){
+      var tx = db.transaction('photos','readwrite');
+      tx.objectStore('photos').put({key:key, value:value});
+      tx.oncomplete = resolve;
+      tx.onerror = reject;
     });
-    if(callback) callback(loaded);
-  }).catch(function(e){
-    console.warn('Chargement photos erreur:', e);
-    if(callback) callback({});
+  }).catch(function(e){ console.warn('IDB set erreur:', e); });
+}
+function idbGet(key){
+  return idbOpen().then(function(db){
+    return new Promise(function(resolve, reject){
+      var tx = db.transaction('photos','readonly');
+      var req = tx.objectStore('photos').get(key);
+      req.onsuccess = function(){ resolve(req.result ? req.result.value : null); };
+      req.onerror = reject;
+    });
+  }).catch(function(){ return null; });
+}
+function idbDelete(key){
+  return idbOpen().then(function(db){
+    return new Promise(function(resolve, reject){
+      var tx = db.transaction('photos','readwrite');
+      tx.objectStore('photos').delete(key);
+      tx.oncomplete = resolve;
+      tx.onerror = reject;
+    });
+  }).catch(function(e){ console.warn('IDB delete erreur:', e); });
+}
+function idbGetAllByPrefix(prefix){
+  return idbOpen().then(function(db){
+    return new Promise(function(resolve, reject){
+      var tx = db.transaction('photos','readonly');
+      var store = tx.objectStore('photos');
+      var results = [];
+      var req = store.openCursor();
+      req.onsuccess = function(e){
+        var cursor = e.target.result;
+        if(cursor){
+          if(cursor.key.startsWith(prefix)) results.push(cursor.value);
+          cursor.continue();
+        } else {
+          resolve(results);
+        }
+      };
+      req.onerror = reject;
+    });
+  }).catch(function(){ return []; });
+}
+function idbDeleteByPrefix(prefix){
+  return idbOpen().then(function(db){
+    return new Promise(function(resolve, reject){
+      var tx = db.transaction('photos','readwrite');
+      var store = tx.objectStore('photos');
+      var req = store.openCursor();
+      req.onsuccess = function(e){
+        var cursor = e.target.result;
+        if(cursor){
+          if(cursor.key.startsWith(prefix)) cursor.delete();
+          cursor.continue();
+        } else { resolve(); }
+      };
+      req.onerror = reject;
+    });
+  }).catch(function(e){ console.warn('IDB deletePrefix erreur:', e); });
+}
+
+// ── Google Drive — dossier photos ─────────────────────────────────────────
+var _drivePhotosFolderId = null; // Sous-dossier "Photos Inventaires"
+
+async function getDrivePhotosFolderId(){
+  if(_drivePhotosFolderId) return _drivePhotosFolderId;
+  if(!gdriveAccessToken) return null;
+  // Trouver ou créer le dossier parent
+  var parentId = gdriveFolderId || await getOrCreateDriveFolder();
+  if(!parentId) return null;
+  var name = 'Photos Inventaires';
+  var search = await fetch(
+    'https://www.googleapis.com/drive/v3/files?q=name="'+name+'" and mimeType="application/vnd.google-apps.folder" and "'+parentId+'" in parents and trashed=false&fields=files(id,name)',
+    {headers:{'Authorization':'Bearer '+gdriveAccessToken}}
+  );
+  var sd = await search.json();
+  if(sd.files && sd.files.length > 0){
+    _drivePhotosFolderId = sd.files[0].id;
+    return _drivePhotosFolderId;
+  }
+  var create = await fetch('https://www.googleapis.com/drive/v3/files',{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+gdriveAccessToken,'Content-Type':'application/json'},
+    body:JSON.stringify({name:name, mimeType:'application/vnd.google-apps.folder', parents:[parentId]})
   });
+  var cd = await create.json();
+  _drivePhotosFolderId = cd.id;
+  return _drivePhotosFolderId;
+}
+
+// Vérifie si le token Drive est valide, sinon affiche popup reconnexion
+async function ensureDriveToken(){
+  if(gdriveAccessToken){
+    // Test rapide
+    try{
+      var r = await fetch('https://www.googleapis.com/drive/v3/about?fields=user',
+        {headers:{'Authorization':'Bearer '+gdriveAccessToken}});
+      if(r.ok) return true;
+    } catch(e){}
+  }
+  // Token expiré — afficher popup reconnexion
+  showDriveReconnect();
+  return false;
+}
+
+function showDriveReconnect(){
+  var existing = document.getElementById('drive-reconnect-toast');
+  if(existing) return; // déjà affiché
+  var toast = document.createElement('div');
+  toast.id = 'drive-reconnect-toast';
+  toast.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#7a2e1a;color:#fff;padding:12px 20px;border-radius:10px;z-index:99999;font-size:13px;display:flex;align-items:center;gap:10px;box-shadow:0 4px 20px rgba(0,0,0,0.3);cursor:pointer;';
+  toast.innerHTML = '🔄 Session Drive expirée — <strong>Cliquez ici pour reconnecter</strong>';
+  toast.onclick = function(){
+    demanderAccesDrive();
+    toast.remove();
+  };
+  document.body.appendChild(toast);
+}
+
+// ── Sauver une photo sur Drive + cache IDB ────────────────────────────────
+async function fbSauverPhoto(dossierId, rowId, photoId, src, label){
+  if(!dossierId) return;
+  var idbKey = 'photo_'+dossierId+'_'+rowId+'_'+photoId;
+  var meta = {id:photoId, rowId:rowId, dossierId:dossierId, label:label||'', driveFileId:null, date:Date.now()};
+
+  // 1. Sauver en cache IDB immédiatement (fonctionne hors-ligne)
+  await idbSet(idbKey, {meta:meta, src:src});
+
+  // 2. Sauver sur Drive si connecté
+  if(!gdriveAccessToken){ return; }
+  try{
+    var ok = await ensureDriveToken();
+    if(!ok) return;
+    var folderId = await getDrivePhotosFolderId();
+    if(!folderId) return;
+    // Convertir base64 en Blob
+    var b64 = src.split(',')[1];
+    var byteChars = atob(b64);
+    var byteArr = new Uint8Array(byteChars.length);
+    for(var i=0;i<byteChars.length;i++) byteArr[i]=byteChars.charCodeAt(i);
+    var blob = new Blob([byteArr],{type:'image/jpeg'});
+    var fileName = dossierId+'__'+rowId+'__'+photoId+'.jpg';
+    var metadata = {name:fileName, parents:[folderId], description: label||''};
+    var form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)],{type:'application/json'}));
+    form.append('file', blob, fileName);
+    var resp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',{
+      method:'POST', headers:{'Authorization':'Bearer '+gdriveAccessToken}, body:form
+    });
+    var data = await resp.json();
+    if(data.id){
+      meta.driveFileId = data.id;
+      // Mettre à jour le cache avec le driveFileId
+      await idbSet(idbKey, {meta:meta, src:src});
+      // Sauver l'index Drive dans Firebase (sans l'image, juste les métadonnées)
+      fbSauverMetaPhoto(dossierId, rowId, photoId, meta);
+    }
+  } catch(e){ console.warn('Drive photo upload erreur:', e); }
+}
+
+// Sauver les métadonnées photo dans Firebase (sans les données binaires)
+function fbSauverMetaPhoto(dossierId, rowId, photoId, meta){
+  var key = 'photometa/'+dossierId+'/'+rowId+'/'+photoId;
+  fbdb.ref(key).set(meta).catch(function(e){ console.warn('Meta photo Firebase erreur:', e); });
+}
+
+// ── Supprimer UNE photo ────────────────────────────────────────────────────
+async function fbSupprimerPhoto(dossierId, rowId, photoId){
+  if(!dossierId) return;
+  var idbKey = 'photo_'+dossierId+'_'+rowId+'_'+photoId;
+  // Récupérer le driveFileId depuis le cache
+  var cached = await idbGet(idbKey);
+  var driveFileId = cached && cached.meta ? cached.meta.driveFileId : null;
+  // Supprimer du cache IDB
+  await idbDelete(idbKey);
+  // Supprimer les métadonnées de Firebase
+  fbdb.ref('photometa/'+dossierId+'/'+rowId+'/'+photoId).remove().catch(function(){});
+  // Supprimer de Drive si on a le fileId et le token
+  if(driveFileId && gdriveAccessToken){
+    try{
+      await fetch('https://www.googleapis.com/drive/v3/files/'+driveFileId,{
+        method:'DELETE', headers:{'Authorization':'Bearer '+gdriveAccessToken}
+      });
+    } catch(e){ console.warn('Drive delete erreur:', e); }
+  }
+}
+
+// ── Supprimer TOUTES les photos d'un dossier ──────────────────────────────
+async function fbSupprimerPhotoDossier(dossierId){
+  if(!dossierId) return;
+  // Récupérer toutes les entrées IDB du dossier
+  var prefix = 'photo_'+dossierId+'_';
+  var entries = await idbGetAllByPrefix(prefix);
+  // Supprimer chaque photo de Drive
+  if(gdriveAccessToken){
+    for(var i=0; i<entries.length; i++){
+      var entry = entries[i];
+      var fid = entry.value && entry.value.meta ? entry.value.meta.driveFileId : null;
+      if(fid){
+        try{
+          await fetch('https://www.googleapis.com/drive/v3/files/'+fid,{
+            method:'DELETE', headers:{'Authorization':'Bearer '+gdriveAccessToken}
+          });
+        } catch(e){}
+      }
+    }
+  }
+  // Supprimer du cache IDB
+  await idbDeleteByPrefix(prefix);
+  // Supprimer les métadonnées Firebase
+  fbdb.ref('photometa/'+dossierId).remove().catch(function(){});
+}
+
+// ── Charger les photos d'un dossier ──────────────────────────────────────
+async function fbChargerPhotos(dossierId, callback){
+  if(!dossierId){ if(callback) callback({}); return; }
+
+  var loaded = {};
+
+  // 1. D'abord depuis le cache IDB (rapide, fonctionne hors-ligne)
+  var prefix = 'photo_'+dossierId+'_';
+  var entries = await idbGetAllByPrefix(prefix);
+  entries.forEach(function(entry){
+    var meta = entry.value && entry.value.meta;
+    var src  = entry.value && entry.value.src;
+    if(!meta || !src) return;
+    var rid = String(meta.rowId);
+    if(!loaded[rid]) loaded[rid] = [];
+    loaded[rid].push({id:meta.id, src:src, label:meta.label||''});
+  });
+
+  if(Object.keys(loaded).length > 0){
+    // On a des photos en cache — afficher immédiatement
+    if(callback) callback(loaded);
+    // Puis tenter de synchroniser depuis Drive en arrière-plan
+    _syncPhotosFromDrive(dossierId, loaded);
+    return;
+  }
+
+  // 2. Pas de cache — essayer de charger depuis Drive via les métadonnées Firebase
+  if(gdriveAccessToken){
+    try{
+      var snap = await fbdb.ref('photometa/'+dossierId).once('value');
+      var metaData = snap.val() || {};
+      var allMeta = [];
+      Object.keys(metaData).forEach(function(rowId){
+        Object.keys(metaData[rowId]||{}).forEach(function(photoId){
+          allMeta.push(metaData[rowId][photoId]);
+        });
+      });
+      if(allMeta.length > 0){
+        // Télécharger les images depuis Drive
+        for(var i=0; i<allMeta.length; i++){
+          var m = allMeta[i];
+          if(!m.driveFileId) continue;
+          try{
+            var imgResp = await fetch(
+              'https://www.googleapis.com/drive/v3/files/'+m.driveFileId+'?alt=media',
+              {headers:{'Authorization':'Bearer '+gdriveAccessToken}}
+            );
+            if(!imgResp.ok) continue;
+            var blob = await imgResp.blob();
+            var src2 = await new Promise(function(res){
+              var fr = new FileReader();
+              fr.onload = function(){ res(fr.result); };
+              fr.readAsDataURL(blob);
+            });
+            var rid2 = String(m.rowId);
+            if(!loaded[rid2]) loaded[rid2]=[];
+            loaded[rid2].push({id:m.id, src:src2, label:m.label||''});
+            // Mettre en cache IDB
+            var idbKey2 = 'photo_'+dossierId+'_'+m.rowId+'_'+m.id;
+            await idbSet(idbKey2, {meta:m, src:src2});
+          } catch(e){ console.warn('Drive téléchargement photo erreur:', e); }
+        }
+      }
+    } catch(e){ console.warn('Chargement meta photos erreur:', e); }
+  }
+
+  if(callback) callback(loaded);
+}
+
+// Sync en arrière-plan depuis Drive (pour mise à jour inter-postes)
+async function _syncPhotosFromDrive(dossierId, localLoaded){
+  if(!gdriveAccessToken) return;
+  try{
+    var ok = await ensureDriveToken();
+    if(!ok) return;
+    var snap = await fbdb.ref('photometa/'+dossierId).once('value');
+    var metaData = snap.val() || {};
+    var localKeys = new Set();
+    Object.keys(localLoaded).forEach(function(rid){
+      (localLoaded[rid]||[]).forEach(function(p){ localKeys.add(String(p.id)); });
+    });
+    // Télécharger les photos présentes sur Drive mais pas en cache local
+    var updated = false;
+    for(var rowId in metaData){
+      for(var photoId in metaData[rowId]){
+        if(!localKeys.has(String(photoId))){
+          var m = metaData[rowId][photoId];
+          if(!m.driveFileId) continue;
+          try{
+            var r = await fetch('https://www.googleapis.com/drive/v3/files/'+m.driveFileId+'?alt=media',
+              {headers:{'Authorization':'Bearer '+gdriveAccessToken}});
+            if(!r.ok) continue;
+            var b = await r.blob();
+            var s = await new Promise(function(res){ var fr=new FileReader(); fr.onload=function(){res(fr.result);}; fr.readAsDataURL(b); });
+            var rid2 = String(m.rowId);
+            if(!rowPhotos[rid2]) rowPhotos[rid2]=[];
+            rowPhotos[rid2].push({id:m.id, src:s, label:m.label||''});
+            await idbSet('photo_'+dossierId+'_'+m.rowId+'_'+m.id, {meta:m, src:s});
+            updated = true;
+          } catch(e){}
+        }
+      }
+    }
+    if(updated){
+      renderRows();
+      syncRowPhotosToGallery();
+    }
+  } catch(e){ console.warn('Sync Drive arrière-plan erreur:', e); }
 }
 </script>
 
@@ -2433,7 +2736,7 @@ function toggleDossierTermine(checked){
   if(!currentDossierId) return;
 
   if(checked){
-    var ok = confirm('Marquer ce dossier comme TERMINÉ ?\n\nLes photos seront supprimées du serveur pour libérer de l\'espace.\n(Les données texte et estimations sont conservées.)');
+    var ok = confirm('Marquer ce dossier comme TERMINÉ ?\n\nLes photos seront supprimées de Google Drive et du cache local pour libérer de l\'espace.\n(Les données texte et estimations sont conservées.)');
     if(!ok){
       document.getElementById('dos-termine').checked = false;
       return;
@@ -2442,7 +2745,7 @@ function toggleDossierTermine(checked){
     if(allDossiers[currentDossierId]){
       allDossiers[currentDossierId].termine = true;
     }
-    // Supprimer les photos de Firebase
+    // Supprimer les photos de Drive + IDB
     fbSupprimerPhotoDossier(currentDossierId);
     // Vider rowPhotos localement
     rowPhotos = {};
@@ -2452,7 +2755,7 @@ function toggleDossierTermine(checked){
     sauverDossierEnCours();
     // Mettre à jour la carte dans la liste
     renderListeDossiers();
-    alert('Dossier marqué comme terminé. Photos supprimées du serveur.');
+    alert('Dossier marqué comme terminé. Photos supprimées de Google Drive et du cache.');
   } else {
     // Rouvrir le dossier
     if(allDossiers[currentDossierId]){
