@@ -1598,8 +1598,8 @@ function renderGallery(){
     });
     html+='<div class="photo-card">';
     html+='<img src="'+p.src+'" alt="photo" onclick="openZoom('+i+')" title="Cliquer pour agrandir"/>';
-    html+='<button class="del-ph" onclick="removePhoto('+p.id+')">x</button>';
-    html+='<div class="pf">'+badge+'<select onchange="setPhotoLine('+p.id+',this.value)">'+opts+'</select></div>';
+    html+='<button class="del-ph" onclick="removePhoto(\''+p.id+'\')">x</button>';
+    html+='<div class="pf">'+badge+'<select onchange="setPhotoLine(\''+p.id+'\',this.value)">'+opts+'</select></div>';
     html+='</div>';
   });
   html+='</div>';
