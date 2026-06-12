@@ -1083,6 +1083,7 @@ async function exportPDF(){
     r.memo?'Memoire':(r.haut?fm(r.haut)+' €':''),
   ]);
 
+  // Largeurs colonnes : 9+107+26+22+22 = 186 = CW (W=210, MG=12 des deux côtés → 186)
   doc.autoTable({
     startY:y,
     margin:{left:MG,right:MG},
@@ -1104,13 +1105,12 @@ async function exportPDF(){
     alternateRowStyles:{fillColor:TC6},
     columnStyles:{
       0:{cellWidth:9,halign:'center',valign:'top'},
-      1:{cellWidth:90,overflow:'linebreak',valign:'top'},
+      1:{cellWidth:107,overflow:'linebreak',valign:'top'},
       2:{cellWidth:26,halign:'center',overflow:'linebreak',valign:'top'},
       3:{cellWidth:22,halign:'right',valign:'top'},
       4:{cellWidth:22,halign:'right',valign:'top'},
     },
     didParseCell: function(data){
-      // Forcer le wrapping sur la colonne description
       if(data.column.index===1){
         data.cell.styles.overflow='linebreak';
         data.cell.styles.valign='top';
@@ -1120,12 +1120,13 @@ async function exportPDF(){
   y=doc.lastAutoTable.finalY+5;
 
   // ── TOTAL ────────────────────────────────────────────────────────────────
-  // Colonnes : 0=9 | 1=90 | 2=26 | 3=22 | 4=22  → total=CW
-  // Col Est.basse bord droit : MG+CW-22  /  Col Est.haute bord droit : MG+CW
+  // Colonnes : 0=9 | 1=107 | 2=26 | 3=22 | 4=22  → total=186=CW
+  // Col Est.basse bord droit : MG+9+107+26+22 = MG+164
+  // Col Est.haute bord droit : MG+CW = MG+186
   fill(TC1);doc.rect(MG,y,CW,8,'F');
   sf(true,9.5,WHITE);
   doc.text('TOTAL',MG+3,y+5.5);
-  doc.text(fm(totBas)+' €',MG+CW-22,y+5.5,{align:'right'});
+  doc.text(fm(totBas)+' €',MG+164,y+5.5,{align:'right'});
   doc.text(fm(totHaut)+' €',MG+CW-1,y+5.5,{align:'right'});
   y+=13;
 
