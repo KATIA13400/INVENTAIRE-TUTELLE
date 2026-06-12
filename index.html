@@ -508,8 +508,17 @@ function updateDriveStatus(){
     var overlay=document.getElementById("login-overlay");
     if(user){
       if(overlay) overlay.style.display="none";
+      // Charger les dossiers depuis Firebase après authentification
+      if(typeof fbChargerTous === 'function' && !window._fbCharge) {
+        window._fbCharge = true;
+        fbChargerTous(function(){
+          renderListeDossiers();
+          if(typeof fbEcouter === 'function') fbEcouter();
+        });
+      }
     } else {
       if(overlay){overlay.style.display="flex";}
+      window._fbCharge = false;
     }
   });
 })();
