@@ -2335,8 +2335,7 @@ function importerDossiers(input){
       });
 
       if(doublons > 0){
-        var ok = confirm(doublons + ' dossier(s) existent déjà.
-Voulez-vous les remplacer par la version importée ?');
+        var ok = confirm(doublons + ' dossier(s) existent déjà.\nVoulez-vous les remplacer par la version importée ?');
         if(ok){
           Object.keys(data.dossiers).forEach(function(id){
             var d = data.dossiers[id];
