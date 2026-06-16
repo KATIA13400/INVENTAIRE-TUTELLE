@@ -1062,6 +1062,18 @@ async function exportPDF(){
   ];
   infoR.forEach((row,i)=>{
     const bg=i%2===0?GREY:TC6;
+    // Ligne fusionnée sur toute la largeur si colonnes 2 et 3 vides
+    if(!row[2]&&!row[3]){
+      const v1=doc.splitTextToSize(row[1]||'',CW-34);
+      const lines=Math.max(v1.length,1);
+      const rh=Math.max(8,lines*4.5+4);
+      fill(bg);doc.rect(MG,y,CW,rh,'F');
+      drw(TC4);lw(0.2);doc.rect(MG,y,CW,rh,'S');
+      sf(true,7.5,TC2);doc.text(row[0],MG+1.5,y+5);
+      sf(false,7.5,BLACK);doc.text(v1,MG+34,y+5);
+      y+=rh;
+      return;
+    }
     const v1=doc.splitTextToSize(row[1]||'',CW/2-34);
     const v2=doc.splitTextToSize(row[3]||'',CW/2-34);
     const lines=Math.max(v1.length,v2.length,1);
