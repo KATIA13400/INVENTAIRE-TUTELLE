@@ -1075,10 +1075,12 @@ async function exportPDF(){
   y+=4;
 
   // ── TABLEAU ──────────────────────────────────────────────────────────────
+  // Nettoyer les espaces multiples qui empêchent le retour à la ligne
+  function cleanText(t){ return (t||'').replace(/\s+/g,' ').trim(); }
   const tdata=rows.map((r,i)=>[
     String(i+1),
-    r.desig||'',
-    r.lieu||'',
+    cleanText(r.desig),
+    cleanText(r.lieu),
     r.memo?'Memoire':(r.bas?fm(r.bas)+' €':''),
     r.memo?'Memoire':(r.haut?fm(r.haut)+' €':''),
   ]);
