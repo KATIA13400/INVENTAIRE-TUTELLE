@@ -911,7 +911,7 @@ function nombreEnLettres(n){
   if(n===0)return'zéro';
   if(n<0)return'moins '+nombreEnLettres(-n);
   let r='';
-  if(n>=1000){r+=nombreEnLettres(Math.floor(n/1000))+' mille ';n%=1000;}
+  if(n>=1000){var m=Math.floor(n/1000);r+=(m===1?'':nombreEnLettres(m)+' ')+'mille ';n%=1000;}
   if(n>=100){
     if(Math.floor(n/100)>1)r+=u[Math.floor(n/100)]+' ';
     r+='cent ';
