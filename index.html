@@ -1056,20 +1056,21 @@ async function exportPDF(){
     ['Etude','SELARLU FAGIANO Katia','Date',fd2(h.dosDate)],
     ['Protégé',h.dosPersonne||'','Heure',h.dosHeure||''],
     ['Domicile inventorié',h.dosAdresse||'','Type de procedure',h.dosType||''],
-    ['En présence de',h.dosPresence||'','',''],
+    h.dosPresence?['__FULL__En présence de',h.dosPresence,'','']:null,
     ['Mandataire',h.mandNom||'','Organisation',h.mandOrg||''],
     ['Adresse mandataire',h.mandAdresse||'','Tribunal',h.mandTribunal+(h.mandJugement?' - ord. du '+fd2(h.mandJugement):'')],
   ];
-  infoR.forEach((row,i)=>{
+  infoR.filter(function(r){return r!==null;}).forEach((row,i)=>{
     const bg=i%2===0?GREY:TC6;
-    // Ligne fusionnée sur toute la largeur si pas de colonne droite
-    if(!row[2]&&!row[3]){
+    // Ligne fusionnée si libellé commence par __FULL__
+    if(row[0].startsWith('__FULL__')){
+      const label=row[0].replace('__FULL__','');
       const v1=doc.splitTextToSize(row[1]||'',CW-36);
       const lines=Math.max(v1.length,1);
       const rh=Math.max(8,lines*4.5+4);
       fill(bg);doc.rect(MG,y,CW,rh,'F');
       drw(TC4);lw(0.2);doc.rect(MG,y,CW,rh,'S');
-      sf(true,7.5,TC2);doc.text(row[0],MG+1.5,y+5);
+      sf(true,7.5,TC2);doc.text(label,MG+1.5,y+5);
       sf(false,7.5,BLACK);doc.text(v1,MG+34,y+5);
       y+=rh;
       return;
