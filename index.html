@@ -673,6 +673,7 @@ function updateDriveStatus(){
     <div class="fg" style="grid-column:span 2"><label>Protégé</label><input id="dos-personne" value="Madame Nicole MARROT Veuve CHEYLAN"/></div>
   </div>
   <div class="fg" style="margin-top:10px"><label>Domicile inventorié</label><textarea id="dos-adresse" rows="2">LE BOCAGE, 36 Bd Jean Jacques Rousseau, 13821 LA PENNE SUR HUVEAUNE</textarea></div>
+  <div class="fg" style="margin-top:10px"><label>En présence de</label><textarea id="dos-presence" rows="2" placeholder="Ex : Madame Julie BRARD VEDEL, mandataire judiciaire"></textarea></div>
   <div class="sep"></div>
   <div class="section-label"><i class="ti ti-users" style="font-size:14px"></i>Mandataire</div>
   <div class="grid3">
@@ -946,7 +947,7 @@ function toISO(d){if(!d)return'';if(d.includes('-'))return d;var p=d.split('/');
 function getH(){
   return{
     dosNum:v('dos-num'),dosType:v('dos-type'),dosDate:v('dos-date'),
-    dosHeure:v('dos-heure'),dosPersonne:v('dos-personne'),dosAdresse:v('dos-adresse'),
+    dosHeure:v('dos-heure'),dosPersonne:v('dos-personne'),dosAdresse:v('dos-adresse'),dosPresence:v('dos-presence'),
     mandNom:v('mand-nom'),mandOrg:v('mand-org'),mandAdresse:v('mand-adresse'),
     mandTribunal:v('mand-tribunal'),mandJugement:v('mand-jugement'),mandVille:v('mand-ville'),
     cpjNom:'Maître Katia FAGIANO',cpjEtude:'SELARLU FAGIANO Katia',
@@ -1055,6 +1056,7 @@ async function exportPDF(){
     ['Etude','SELARLU FAGIANO Katia','Date',fd2(h.dosDate)],
     ['Protégé',h.dosPersonne||'','Heure',h.dosHeure||''],
     ['Domicile inventorié',h.dosAdresse||'','Type de procedure',h.dosType||''],
+    ['En présence de',h.dosPresence||'','',''],
     ['Mandataire',h.mandNom||'','Organisation',h.mandOrg||''],
     ['Adresse mandataire',h.mandAdresse||'','Tribunal',h.mandTribunal+(h.mandJugement?' - ord. du '+fd2(h.mandJugement):'')],
   ];
@@ -1513,7 +1515,7 @@ function clearDossier(){
   currentDossierId=null;
   document.getElementById('badge-dossier-actif').style.display='none';
   document.getElementById('dossier-zone').classList.remove('visible');
-  ['dos-num','dos-date','dos-heure','dos-personne','dos-adresse',
+  ['dos-num','dos-date','dos-heure','dos-personne','dos-adresse','dos-presence',
    'mand-nom','mand-org','mand-adresse','mand-tribunal','mand-jugement','mand-ville']
   .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   clearExpertise();
@@ -1766,7 +1768,7 @@ async function extractOrd(b64,apiKey){
     const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1000,system:'Tu es un extracteur de données juridiques. Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans markdown, sans explication.',messages:[{role:'user',content:[{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},{type:'text',text:'Extrais les informations de ce jugement. Réponds UNIQUEMENT avec ce JSON (rien d\'autre) : {"dosType":"TUTELLE ou CURATELLE ou SUCCESSION ou SAUVEGARDE DE JUSTICE ou HABILITATION FAMILIALE ou AUTRE","dosPersonne":"civilité prénom NOM du protégé","dosAdresse":"adresse domicile du protégé","mandNom":"prénom NOM du mandataire","mandOrg":"organisation du mandataire","mandAdresse":"adresse du mandataire","mandTribunal":"Tribunal compétent","mandJugement":"date jugement JJ/MM/AAAA","mandVille":"ville du tribunal"}'}]}]})});
     const data=await resp.json();if(data.error)throw new Error(data.error.message);
     const parsed=JSON.parse(data.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim());
-    const map={dosType:'dos-type',dosPersonne:'dos-personne',dosAdresse:'dos-adresse',mandNom:'mand-nom',mandOrg:'mand-org',mandAdresse:'mand-adresse',mandTribunal:'mand-tribunal',mandVille:'mand-ville'};
+    const map={dosType:'dos-type',dosPersonne:'dos-personne',dosAdresse:'dos-adresse',dosPresence:'dos-presence',mandNom:'mand-nom',mandOrg:'mand-org',mandAdresse:'mand-adresse',mandTribunal:'mand-tribunal',mandVille:'mand-ville'};
     Object.keys(map).forEach(k=>{const el=document.getElementById(map[k]);if(el&&parsed[k])el.value=parsed[k];});
     if(parsed.mandJugement){const p=parsed.mandJugement.split('/');if(p.length===3){const el=document.getElementById('mand-jugement');if(el)el.value=p[2]+'-'+p[1]+'-'+p[0];}}
     setOrdStatus('ok','Informations extraites pour '+(parsed.dosPersonne||'le dossier')+'.');
@@ -1913,7 +1915,7 @@ function ouvrirDossier(id){
   // Charger les infos dans le formulaire
   const h=d.h||{};
   const map={dosNum:'dos-num',dosType:'dos-type',dosDate:'dos-date',dosHeure:'dos-heure',
-    dosPersonne:'dos-personne',dosAdresse:'dos-adresse',mandNom:'mand-nom',
+    dosPersonne:'dos-personne',dosAdresse:'dos-adresse',dosPresence:'dos-presence',mandNom:'mand-nom',
     mandOrg:'mand-org',mandAdresse:'mand-adresse',mandTribunal:'mand-tribunal',
     mandJugement:'mand-jugement',mandVille:'mand-ville'};
   Object.keys(map).forEach(k=>{
@@ -1995,7 +1997,7 @@ function supprimerDossier(id){
     document.getElementById('badge-dossier-actif').style.display='none';
     document.getElementById('dossier-zone').classList.remove('visible');
     // Vider le formulaire
-    ['dos-num','dos-date','dos-heure','dos-personne','dos-adresse',
+    ['dos-num','dos-date','dos-heure','dos-personne','dos-adresse','dos-presence',
      'mand-nom','mand-org','mand-adresse','mand-tribunal','mand-jugement','mand-ville']
     .forEach(id2=>{const el=document.getElementById(id2);if(el)el.value='';});
     renderRows();renderGallery();
