@@ -1062,9 +1062,9 @@ async function exportPDF(){
   ];
   infoR.forEach((row,i)=>{
     const bg=i%2===0?GREY:TC6;
-    // Ligne fusionnée sur toute la largeur si colonnes 2 et 3 vides
+    // Ligne fusionnée sur toute la largeur si pas de colonne droite
     if(!row[2]&&!row[3]){
-      const v1=doc.splitTextToSize(row[1]||'',CW-34);
+      const v1=doc.splitTextToSize(row[1]||'',CW-36);
       const lines=Math.max(v1.length,1);
       const rh=Math.max(8,lines*4.5+4);
       fill(bg);doc.rect(MG,y,CW,rh,'F');
