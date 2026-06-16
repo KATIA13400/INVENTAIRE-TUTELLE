@@ -1081,8 +1081,8 @@ async function exportPDF(){
     String(i+1),
     cleanText(r.desig),
     cleanText(r.lieu),
-    r.memo?'Memoire':(r.bas?fm(r.bas)+' €':''),
-    r.memo?'Memoire':(r.haut?fm(r.haut)+' €':''),
+    r.memo?'Mémoire':(r.bas?fm(r.bas)+' €':''),
+    r.memo?'Mémoire':(r.haut?fm(r.haut)+' €':''),
   ]);
 
   // Largeurs colonnes : 9+107+26+22+22 = 186 = CW (W=210, MG=12 des deux côtés → 186)
