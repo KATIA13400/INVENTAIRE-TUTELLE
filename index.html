@@ -697,7 +697,7 @@ function updateDriveStatus(){
     <div class="exp-photos-col">
       <div class="exp-drop-zone" id="exp-drop-zone" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleExpDrop(event)" onclick="document.getElementById('exp-img-input').click()">
         <i class="ti ti-camera" style="font-size:26px;color:var(--tc3)"></i><br>
-        <strong style="font-size:13px">Ajouter des photos de l'objet</strong>
+        <strong style="font-size:13px">Ajouter des photos de l\'objet</strong>
         <p>Face, dos, signature… — cliquer ou glisser</p>
       </div>
       <input type="file" id="exp-img-input" accept="image/*" multiple style="display:none" onchange="loadExpImages(this.files)"/>
@@ -852,7 +852,7 @@ function updateDriveStatus(){
     </div>
     <div style="padding-bottom:4px;font-size:12px;color:var(--text2);flex:2">
       <i class="ti ti-info-circle" style="font-size:13px"></i>
-      Dès qu'une désignation contient un poids (ex : <strong>34,6 gr</strong>), les estimations sont calculées automatiquement. Vous pouvez les ajuster manuellement ensuite.
+      Dès qu\'une désignation contient un poids (ex : <strong>34,6 gr</strong>), les estimations sont calculées automatiquement. Vous pouvez les ajuster manuellement ensuite.
     </div>
   </div>
 </div>
@@ -963,7 +963,7 @@ const DATA_CHEYLAN=[
   {desig:"Un lot comprenant accessoires de toilette et linge de maison",lieu:"Salle de bain",bas:"",haut:"",memo:true},
   {desig:"Un lot comprenant une duchesse garniture de tissu, deux lits une place et leur literie, deux chaises, un chevet à caisson en bois de placage, un bureau de pente en bois de placage marqueté style Louis XVI, une armoire en bois mouluré sculpté style Louis XV, une commode façade galbée en bois mouluré et sculpté style Louis XV, un lustre en bois sculpté à six bras de lumière. L'ensemble",lieu:"Chambre 1",bas:"250",haut:"",memo:false},
   {desig:"Un miroir de cheminée à pares closes et fronton à décors de putti",lieu:"Chambre 1",bas:"150",haut:"",memo:false},
-  {desig:"Une pendule en marbre rouge sommée d'un sujet en régule sculpté figurant un enfant. Accident.",lieu:"Chambre 1",bas:"20",haut:"",memo:false},
+  {desig:"Une pendule en marbre rouge sommée d\'un sujet en régule sculpté figurant un enfant. Accident.",lieu:"Chambre 1",bas:"20",haut:"",memo:false},
   {desig:"Une paire de vases en porcelaine deux anses",lieu:"Chambre 1",bas:"",haut:"",memo:false},
   {desig:"Une HST Léo Legrer — Paysage provençal",lieu:"Chambre 1",bas:"",haut:"",memo:false},
   {desig:"Un lot comprenant une montre de gousset en métal argenté, bijoux fantaisie, stylos divers, un bénitier mural, boutons de manchette, PMD, un reliquaire encadré, fleurs sous verre. L'ensemble",lieu:"Chambre 1",bas:"",haut:"",memo:false},
@@ -2048,7 +2048,7 @@ function ouvrirDossier(id){
     rowsToLoad = d.rows||[];
   }
 
-  // Charger toutes les lignes d'un coup sans renderRows intermédiaire
+  // Charger toutes les lignes d\'un coup sans renderRows intermédiaire
   rowsToLoad.forEach(function(r){
     var newId=++rowId;
     var row={id:newId,desig:r.desig||'',lieu:r.lieu||'',bas:r.bas||'',haut:r.haut||'',memo:r.memo||false};
@@ -3186,7 +3186,7 @@ function exportMandatPDF(){
     mandantsTexte=parts.join(' et ');
   }
   if(m.representant){mandantsTexte+=' ; représentés par '+m.representant;}
-  mandantsTexte+='\n\nAutorisent la SAS PARCS ENCHERES, Opérateur de Ventes Volontaires sis à AUBAGNE 13400, RN8, ZI St Mître à organiser la vente aux enchères publiques des biens et objets mobiliers désignés au présent document et d'engager les frais ci-dessous :';
+  mandantsTexte+='\n\nAutorisent la SAS PARCS ENCHERES, Opérateur de Ventes Volontaires sis à AUBAGNE 13400, RN8, ZI St Mître à organiser la vente aux enchères publiques des biens et objets mobiliers désignés au présent document et d\'engager les frais ci-dessous :';
 
   sf(false,8.5,BLACK);
   var texteLines=doc.splitTextToSize(mandantsTexte,CW);
@@ -3238,18 +3238,18 @@ function exportMandatPDF(){
   y+=10;
 
   var cgv=[
-    'Prière de nous retourner ce contrat signé avant la vente, de conserver le duplicata, et de nous envoyer impérativement une photocopie de votre pièce d'identité (CNI ou passeport) ainsi que votre RIB.',
+    'Prière de nous retourner ce contrat signé avant la vente, de conserver le duplicata, et de nous envoyer impérativement une photocopie de votre pièce d\'identité (CNI ou passeport) ainsi que votre RIB.',
     '',
-    'Dans le cadre de nos activités de ventes aux enchères publiques, la SAS PARCS ENCHERES est amenée à collecter des données à caractère personnel. Que vous soyez vendeur potentiel ou acheteur potentiel, vous disposez dès lors d'un droit d'accès, de rectification et d'opposition sur vos données personnelles en vous adressant par tout moyen directement à PARCS ENCHERES. Nous pourrons utiliser ces données afin de satisfaire à nos obligations légales et aux fins d'exercice de notre activité. Ces données pourront également être communiquées aux autorités compétentes dès lors que la règlementation l'impose.',
+    'Dans le cadre de nos activités de ventes aux enchères publiques, la SAS PARCS ENCHERES est amenée à collecter des données à caractère personnel. Que vous soyez vendeur potentiel ou acheteur potentiel, vous disposez dès lors d\'un droit d\'accès, de rectification et d\'opposition sur vos données personnelles en vous adressant par tout moyen directement à PARCS ENCHERES. Nous pourrons utiliser ces données afin de satisfaire à nos obligations légales et aux fins d\'exercice de notre activité. Ces données pourront également être communiquées aux autorités compétentes dès lors que la règlementation l\'impose.',
     '',
     'Règlement du produit net : 30/60 jours après la vente.',
-    'Le règlement pourra se trouver différé en cas de préemption par l'État ou d'achat étranger.',
-    'SAS PARCS ENCHÈRES OVV sera tenue de payer le vendeur lorsqu'elle aura été réglée par l'adjudicataire.',
+    'Le règlement pourra se trouver différé en cas de préemption par l\'État ou d\'achat étranger.',
+    'SAS PARCS ENCHÈRES OVV sera tenue de payer le vendeur lorsqu\'elle aura été réglée par l\'adjudicataire.',
     '',
     'IMPORTANT : Sans instructions particulières de votre part, ces objets seront vendus au plus offrant et dernier enchérisseur.',
-    'En application de la loi du 10/07/2000, le prix de réserve ne peut être supérieur à l'estimation basse.',
-    'Seuls les lots dont l'estimation basse est supérieure ou égale à 200 € pourront faire l'objet d'un prix de réserve. La réserve s'entend à 10% près.',
-    'En cas d'invendus, SAS PARCS ENCHÈRES OVV se réserve le droit de vendre les lots de gré à gré ou de les présenter à nouveau.'
+    'En application de la loi du 10/07/2000, le prix de réserve ne peut être supérieur à l\'estimation basse.',
+    'Seuls les lots dont l\'estimation basse est supérieure ou égale à 200 € pourront faire l\'objet d\'un prix de réserve. La réserve s\'entend à 10% près.',
+    'En cas d\'invendus, SAS PARCS ENCHÈRES OVV se réserve le droit de vendre les lots de gré à gré ou de les présenter à nouveau.'
   ];
 
   sf(false,7.5,BLACK);
