@@ -79,6 +79,7 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 
 /* Table */
 .table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:auto;margin-bottom:1rem}
+.table-wrap table{table-layout:fixed;width:100%}
 table{width:100%;border-collapse:collapse;font-size:12px;min-width:620px}
 thead tr{background:var(--tc1);}
 th{padding:11px 8px;text-align:left;font-weight:700;font-size:11px;color:#fff !important;border-bottom:2px solid var(--tc3);white-space:nowrap;letter-spacing:.04em;text-transform:uppercase;visibility:visible !important;opacity:1 !important;}
@@ -646,10 +647,11 @@ function updateDriveStatus(){
     </div>
 
     <!-- ACTIONS -->
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
       <button class="btn terra" onclick="sauverMandat()"><i class="ti ti-device-floppy" style="font-size:13px"></i> Sauvegarder</button>
       <button class="btn pdf-btn" onclick="exportMandatPDF()"><i class="ti ti-file-type-pdf" style="font-size:13px"></i> Exporter PDF</button>
       <button class="btn" onclick="fermerModalMandat()"><i class="ti ti-x" style="font-size:13px"></i> Fermer</button>
+      <span id="mand-autosave-ind" style="font-size:11px;color:#2e7d32;opacity:0;transition:opacity .3s;margin-left:4px">Enregistré ✓</span>
     </div>
   </div>
 </div>
@@ -3114,6 +3116,45 @@ function sauverMandat(){
   alert('Mandat sauvegardé !');
 }
 
+// ── SAUVEGARDE AUTOMATIQUE ───────────────────────────────
+var _mandatAutosaveTimer=null;
+var _mandatAutosaveIndicator=null;
+function autoSaveMandat(){
+  if(!currentMandatId)return;
+  var m=allMandats[currentMandatId];
+  if(!m)return;
+  var elNum=document.getElementById('mand-num');
+  var elDate=document.getElementById('mand-date');
+  var elRep=document.getElementById('mand-representant');
+  if(!elNum||!elDate||!elRep)return;
+  m.num=elNum.value.trim();
+  m.date=elDate.value;
+  m.representant=elRep.value.trim();
+  m.mandants=JSON.parse(JSON.stringify(mandatMandants));
+  m.lots=JSON.parse(JSON.stringify(mandatLots));
+  sauverMandatFirebase(currentMandatId);
+  var ind=document.getElementById('mand-autosave-ind');
+  if(ind){
+    ind.textContent='Enregistré ✓';
+    ind.style.opacity='1';
+    clearTimeout(_mandatAutosaveIndicator);
+    _mandatAutosaveIndicator=setTimeout(function(){ind.style.opacity='0';},1500);
+  }
+}
+function scheduleMandatAutosave(){
+  clearTimeout(_mandatAutosaveTimer);
+  _mandatAutosaveTimer=setTimeout(autoSaveMandat,1200);
+}
+document.addEventListener('DOMContentLoaded',function(){
+  var modalMandat=document.getElementById('modal-mandat');
+  if(modalMandat){
+    modalMandat.addEventListener('input',scheduleMandatAutosave);
+    modalMandat.addEventListener('click',function(e){
+      if(e.target.closest('.btn-add,.btn-del')){scheduleMandatAutosave();}
+    });
+  }
+});
+
 function supprimerMandat(id){
   if(!confirm('Supprimer ce mandat ?'))return;
   supprimerMandatFirebase(id);
@@ -3238,18 +3279,53 @@ function exportMandatPDF(){
   y+=10;
 
   var cgv=[
-    'Prière de nous retourner ce contrat signé avant la vente, de conserver le duplicata, et de nous envoyer impérativement une photocopie de votre pièce d\'identité (CNI ou passeport) ainsi que votre RIB.',
-    '',
-    'Dans le cadre de nos activités de ventes aux enchères publiques, la SAS PARCS ENCHERES est amenée à collecter des données à caractère personnel. Que vous soyez vendeur potentiel ou acheteur potentiel, vous disposez dès lors d\'un droit d\'accès, de rectification et d\'opposition sur vos données personnelles en vous adressant par tout moyen directement à PARCS ENCHERES. Nous pourrons utiliser ces données afin de satisfaire à nos obligations légales et aux fins d\'exercice de notre activité. Ces données pourront également être communiquées aux autorités compétentes dès lors que la règlementation l\'impose.',
-    '',
-    'Règlement du produit net : 30/60 jours après la vente.',
-    'Le règlement pourra se trouver différé en cas de préemption par l\'État ou d\'achat étranger.',
-    'SAS PARCS ENCHÈRES OVV sera tenue de payer le vendeur lorsqu\'elle aura été réglée par l\'adjudicataire.',
-    '',
-    'IMPORTANT : Sans instructions particulières de votre part, ces objets seront vendus au plus offrant et dernier enchérisseur.',
-    'En application de la loi du 10/07/2000, le prix de réserve ne peut être supérieur à l\'estimation basse.',
-    'Seuls les lots dont l\'estimation basse est supérieure ou égale à 200 € pourront faire l\'objet d\'un prix de réserve. La réserve s\'entend à 10% près.',
-    'En cas d\'invendus, SAS PARCS ENCHÈRES OVV se réserve le droit de vendre les lots de gré à gré ou de les présenter à nouveau.'
+    "CONDITIONS GÉNÉRALES DE VENTE & MANDAT DE VENTE - SAS PARCS ENCHERES OVV",
+    "Agrément n° [À compléter] - Mandataire agissant pour le compte du vendeur",
+    "",
+    "1. FRAIS, TAXES ET DISPOSITIONS PARTICULIÈRES",
+    "Au prix d'adjudication (produit net de la vente), peuvent s'ajouter à la charge du vendeur les frais et taxes suivants :",
+    "- Transport et stockage : remboursement sur justificatif de la facture de transport et de garde-meubles.",
+    "- Frais annexes : frais de photographie ainsi que tout autre frais direct de gestion de la vente.",
+    "- Droit de suite & reproduction : conformément à la loi du 11.03.57, le droit de suite sera versé à l'artiste ou à ses héritiers, ainsi que les droits de reproduction éventuels. Taux dégressif par tranche du prix :",
+    "   . 4% jusqu'à 50 000 €",
+    "   . 3% de 50 000,01 € à 200 000 €",
+    "   . 1% de 200 000,01 € à 350 000 €",
+    "   . 0,5% de 350 000,01 € à 500 000 €",
+    "   . 0,25% au-delà de 500 000,01 €",
+    "- Contrôle des métaux précieux : forfait de 10 € HT par article pour le contrôle et le poinçonnage.",
+    "",
+    "2. RÉGIME FISCAL DES MÉTAUX PRÉCIEUX & OBJETS D'ART",
+    "Conformément à la réglementation fiscale française, la SAS PARCS ENCHERES OVV agit en qualité de collecteur d'impôt. Les taxes dues seront retenues d'office sur le produit de la vente et reversées à l'administration fiscale.",
+    "- Métaux précieux (lingots, barres, pièces d'or/argent post-1800) - Régime forfaitaire par défaut : taxe forfaitaire de 11,5% au total (11% de taxe sur les métaux précieux + 0,5% de CRDS), assise sur le prix d'adjudication brut, dès le premier euro.",
+    "- Métaux précieux - Option régime des plus-values (TPV) : taxe de 37,6% (19% d'impôt sur la plus-value + 18,6% de prélèvements sociaux incluant CSG et CRDS) appliquée uniquement sur la plus-value réelle. Abattement de 5% par an à partir de la 3e année (exonération totale après 22 ans). Justificatif d'acquisition nominatif obligatoire.",
+    "- Bijoux, objets d'art, de collection ou d'antiquité - Régime forfaitaire par défaut : taxe forfaitaire de 6,5% (6% de taxe + 0,5% de CRDS) applicable uniquement sur chaque adjudication supérieure à 5 000 €.",
+    "- Bijoux, objets d'art - Option plus-value réelle : taxe au taux de droit commun, sous réserve d'opter expressément avant la vente et de fournir un justificatif de propriété nominatif et probant (facture nominative, acte de succession ou de donation permettant de justifier d'une propriété de plus de 22 ans pour exonération totale).",
+    "",
+    "Choix de l'option fiscale par le Mandant (uniquement en cas de présentation de justificatifs valides) :",
+    "[  ] Je souhaite appliquer le régime forfaitaire par défaut.",
+    "[  ] Je souhaite opter pour le régime des plus-values réelles et fournis les justificatifs requis.",
+    "",
+    "3. RÉGIME DE TVA DU VENDEUR",
+    "Le Mandant doit obligatoirement déclarer sa situation au regard de la TVA en cochant la case correspondante ci-dessous :",
+    "[  ] 1. Vendeur particulier",
+    "[  ] 2. Vendeur redevable de la T.V.A. française au titre de la vente (merci de joindre impérativement un extrait Kbis récent).",
+    "[  ] 3. Vendeur identifié à la T.V.A. dans un autre État membre de la C.E.E. sous le N° : ______________________ et s'engage à remplir sous sa seule responsabilité les obligations fiscales en résultant.",
+    "La SAS PARCS ENCHERES OVV, étant un mandataire agissant pour le compte du vendeur, décline toute responsabilité quant aux conséquences juridiques et fiscales d'une fausse déclaration ou du non-paiement de la T.V.A. auprès des autorités fiscales compétentes.",
+    "",
+    "4. RÈGLEMENT ET MODALITÉS DE PAIEMENT",
+    "- Délai standard : le règlement du produit net de la vente intervient dans un délai de 30 à 60 jours après la clôture de la vente.",
+    "- Règlement subordonné : conformément à la législation, la SAS PARCS ENCHERES OVV n'est tenue de payer le vendeur qu'à la condition d'avoir elle-même été effectivement et intégralement réglée par l'adjudicataire.",
+    "- Délais spécifiques : le règlement pourra se trouver légitimement différé en cas d'exercice du droit de préemption par l'État français ou en cas de formalités d'exportation liées à un achat étranger.",
+    "",
+    "5. CONDITIONS DE MISE EN VENTE ET INVENDUS (IMPORTANT)",
+    "Sauf instructions contraires et particulières écrites de votre part, les règles suivantes s'appliquent d'office :",
+    "- Absence de prix de réserve : à défaut d'instruction, les objets seront vendus au plus offrant et dernier enchérisseur.",
+    "- Fixation de la réserve : en application de la loi du 10/07/2000, le prix de réserve conventionnel ne peut en aucun cas être supérieur à l'estimation basse fixée par l'O.V.V. Seuls les lots dont l'estimation basse est supérieure ou égale à 200 € pourront faire l'objet d'un prix de réserve. La réserve acceptée s'entend à 10% près par rapport au montant indiqué.",
+    "- Gestion des invendus : en cas d'invendus à la criée, la SAS PARCS ENCHERES OVV se réserve expressément le droit de vendre les lots de gré à gré (après-vente) au prix de la réserve, ou de les présenter à nouveau dans une prochaine vente aux enchères publique.",
+    "- Droit de rétractation (Loi Hamon / Code de la consommation) : en cas de signature du présent mandat à distance ou hors établissement, le Mandant particulier demande expressément l'exécution immédiate des prestations de services de la SAS PARCS ENCHERES OVV avant la fin du délai légal de rétractation de quatorze (14) jours. Le Mandant reconnaît et accepte expressément qu'il renonce définitivement à son droit de rétractation à compter de l'adjudication publique du ou des lots concernés.",
+    "",
+    "Fait à ______________________, le ______________________",
+    "Signature du Mandant (précédée de la mention manuscrite \"Bon pour accord et mandat de vente\") :"
   ];
 
   sf(false,7.5,BLACK);
