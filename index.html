@@ -3191,6 +3191,7 @@ function exportMandatPDF(){
   function lw(n){doc.setLineWidth(n);}
   function sf(bold,size,c){doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(size);doc.setTextColor(c[0],c[1],c[2]);}
   function fm(n){return parseFloat(n)||0;}
+  function fmtMontant(n){return n.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/[\u00A0\u202F]/g,' ');}
 
   // EN-TÊTE PARCS ENCHERES
   fill(TC5);doc.rect(MG,y,CW,26,'F');
@@ -3239,7 +3240,7 @@ function exportMandatPDF(){
   y+=texteLines.length*4.5+6;
 
   // TABLEAU LOTS
-  var tdata=m.lots.map(function(l,i){return[String(i+1),l.desig||'',l.bas?(fm(l.bas).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'):'',l.haut?(fm(l.haut).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'):''];});
+  var tdata=m.lots.map(function(l,i){return[String(i+1),l.desig||'',l.bas?(fmtMontant(fm(l.bas))+' €'):'',l.haut?(fmtMontant(fm(l.haut))+' €'):''];});
 
   doc.autoTable({
     startY:y,
@@ -3266,8 +3267,8 @@ function exportMandatPDF(){
   fill(TC1);doc.rect(MG,y,CW,8,'F');
   sf(true,9,WHITE);
   doc.text('TOTAL ESTIMATIONS',MG+3,y+5.5);
-  doc.text(totBas.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €',MG+CW-27,y+5.5,{align:'right'});
-  doc.text(totHaut.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €',MG+CW-1,y+5.5,{align:'right'});
+  doc.text(fmtMontant(totBas)+' €',MG+CW-27,y+5.5,{align:'right'});
+  doc.text(fmtMontant(totHaut)+' €',MG+CW-1,y+5.5,{align:'right'});
   y+=14;
 
   // DATE ET SIGNATURE
