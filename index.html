@@ -559,6 +559,101 @@ function updateDriveStatus(){
   </div>
 </div>
 
+<!-- SECTION MANDATS DE VENTE -->
+<div class="dossier-manager" style="margin-top:1rem">
+  <div class="dossier-header">
+    <div class="dossier-title">
+      <i class="ti ti-writing" style="font-size:18px"></i>
+      Mes mandats de vente volontaires
+    </div>
+    <div class="dossier-actions">
+      <button class="btn terra" onclick="ouvrirModalNouveauMandat()"><i class="ti ti-plus" style="font-size:13px"></i> Nouveau mandat</button>
+      <button class="btn" onclick="toggleListeMandats()" id="btn-toggle-mandats"><i class="ti ti-list" style="font-size:13px"></i> Tous les mandats</button>
+    </div>
+  </div>
+  <div id="liste-mandats" style="display:none">
+    <div id="mandats-contenu"><div class="empty-dossiers">Aucun mandat enregistré. Créez votre premier mandat !</div></div>
+  </div>
+</div>
+
+<!-- MODAL NOUVEAU MANDAT -->
+<div class="modal-overlay" id="modal-nouveau-mandat">
+  <div class="modal-box">
+    <h3><i class="ti ti-writing"></i> Nouveau mandat de vente</h3>
+    <div class="fg"><label>Nom du mandat (ex: MARTIN Jean 2026)</label><input id="new-mand-nom" placeholder="NOM Prénom AAAA" style="font-family:inherit;font-size:13px;border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;width:100%;background:var(--bg3);color:var(--text)"/></div>
+    <div class="fg"><label>Année</label>
+      <select id="new-mand-annee" style="font-family:inherit;font-size:13px;border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;width:100%;background:var(--bg3);color:var(--text)">
+        <option>2024</option><option>2025</option><option selected>2026</option><option>2027</option><option>2028</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px">
+      <button class="btn terra" onclick="creerNouveauMandat()" style="flex:1">Créer</button>
+      <button class="btn" onclick="fermerModalNouveauMandat()" style="flex:1">Annuler</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL MANDAT DE VENTE -->
+<div class="modal-overlay" id="modal-mandat" style="display:none;align-items:flex-start;padding:10px;overflow-y:auto">
+  <div class="modal-box" style="max-width:800px;width:100%;margin:auto;max-height:none">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <h3><i class="ti ti-writing"></i> Mandat de vente volontaire</h3>
+      <button class="btn" onclick="fermerModalMandat()"><i class="ti ti-x"></i></button>
+    </div>
+
+    <!-- EN-TÊTE -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="section-label"><i class="ti ti-building" style="font-size:14px"></i>Informations générales</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="fg"><label>Numéro de mandat</label><input id="mand-num" placeholder="Ex: MV26001"/></div>
+        <div class="fg"><label>Date</label><input id="mand-date" type="date"/></div>
+      </div>
+    </div>
+
+    <!-- MANDANTS -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="section-label"><i class="ti ti-users" style="font-size:14px"></i>Mandants (vendeurs)</div>
+      <div id="mandants-liste"></div>
+      <button class="btn-add" onclick="ajouterMandant()" style="margin-top:8px"><i class="ti ti-plus" style="font-size:13px"></i> Ajouter un mandant</button>
+    </div>
+
+    <!-- REPRÉSENTANT -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="section-label"><i class="ti ti-user-check" style="font-size:14px"></i>Représentant (si applicable)</div>
+      <div class="fg"><label>Représenté par</label><textarea id="mand-representant" rows="2" placeholder="Ex: Maître Sébastien JARDIN, Notaire Associé…"></textarea></div>
+    </div>
+
+    <!-- LOTS -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="section-label"><i class="ti ti-list" style="font-size:14px"></i>Objets / Lots</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th style="width:40px">N°</th>
+            <th>Désignation</th>
+            <th style="width:110px">Est. basse (€)</th>
+            <th style="width:110px">Est. haute (€)</th>
+            <th style="width:50px"></th>
+          </tr></thead>
+          <tbody id="mandat-lots-body"></tbody>
+        </table>
+      </div>
+      <button class="btn-add" onclick="ajouterLotMandat()" style="margin-top:8px"><i class="ti ti-plus" style="font-size:13px"></i> Ajouter un lot</button>
+      <div style="display:flex;justify-content:flex-end;gap:16px;margin-top:8px;font-weight:600;font-size:13px;color:var(--tc1)">
+        <span>Total estimations basses : <span id="mand-total-bas">0,00 €</span></span>
+        <span>Total estimations hautes : <span id="mand-total-haut">0,00 €</span></span>
+      </div>
+    </div>
+
+    <!-- ACTIONS -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn terra" onclick="sauverMandat()"><i class="ti ti-device-floppy" style="font-size:13px"></i> Sauvegarder</button>
+      <button class="btn pdf-btn" onclick="exportMandatPDF()"><i class="ti ti-file-type-pdf" style="font-size:13px"></i> Exporter PDF</button>
+      <button class="btn" onclick="fermerModalMandat()"><i class="ti ti-x" style="font-size:13px"></i> Fermer</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL NOUVEAU DOSSIER -->
 <div class="modal-overlay" id="modal-nouveau">
   <div class="modal-box">
@@ -2795,6 +2890,395 @@ async function exportMandatPDF(){
   doc.save('Mandat_Vente_'+nom+'.pdf');
   fermerModalMandat();
 }
+
+// ═══════════════════════════════════════════════════════════
+// MANDATS DE VENTE VOLONTAIRES
+// ═══════════════════════════════════════════════════════════
+
+let allMandats = {};
+let currentMandatId = null;
+let mandatMandants = [];
+let mandatLots = [];
+let mandatLotId = 0;
+
+// Charger depuis Firebase
+function chargerMandatsFirebase(){
+  if(!fbdb)return;
+  var uid = firebase.auth().currentUser&&firebase.auth().currentUser.uid;
+  if(!uid)return;
+  fbdb.ref('mandats/'+uid).on('value',function(snap){
+    allMandats = snap.val()||{};
+    renderListeMandats();
+  });
+}
+
+function sauverMandatFirebase(id){
+  if(!fbdb||!id)return;
+  var uid = firebase.auth().currentUser&&firebase.auth().currentUser.uid;
+  if(!uid)return;
+  fbdb.ref('mandats/'+uid+'/'+id).set(allMandats[id]);
+}
+
+function supprimerMandatFirebase(id){
+  if(!fbdb||!id)return;
+  var uid = firebase.auth().currentUser&&firebase.auth().currentUser.uid;
+  if(!uid)return;
+  fbdb.ref('mandats/'+uid+'/'+id).remove();
+}
+
+// ── LISTE MANDATS ────────────────────────────────────────
+function toggleListeMandats(){
+  var el=document.getElementById('liste-mandats');
+  var btn=document.getElementById('btn-toggle-mandats');
+  if(el.style.display==='none'){
+    el.style.display='block';
+    btn.innerHTML='<i class="ti ti-list" style="font-size:13px"></i> Masquer';
+    renderListeMandats();
+  } else {
+    el.style.display='none';
+    btn.innerHTML='<i class="ti ti-list" style="font-size:13px"></i> Tous les mandats';
+  }
+}
+
+function renderListeMandats(){
+  var el=document.getElementById('mandats-contenu');
+  var ids=Object.keys(allMandats);
+  if(ids.length===0){el.innerHTML='<div class="empty-dossiers">Aucun mandat enregistré. Créez votre premier mandat !</div>';return;}
+  var parAnnee={};
+  ids.forEach(function(id){
+    var m=allMandats[id];
+    var annee=m.annee||'Non classé';
+    if(!parAnnee[annee])parAnnee[annee]=[];
+    parAnnee[annee].push({id:id,...m});
+  });
+  var anneesSorted=Object.keys(parAnnee).sort(function(a,b){return b-a;});
+  var html='';
+  anneesSorted.forEach(function(annee){
+    html+='<div class="annee-groupe"><div class="annee-label"><i class="ti ti-calendar"></i> '+annee+'</div><div class="dossier-grid">';
+    parAnnee[annee].forEach(function(m){
+      var isActive=m.id===currentMandatId;
+      var nbLots=m.lots?m.lots.length:0;
+      var dateCreation=m.dateCreation?new Date(m.dateCreation).toLocaleDateString('fr-FR'):'';
+      html+='<div class="dossier-card'+(isActive?' active':'')+'" onclick="ouvrirMandat(''+m.id+'')">';
+      html+='<button class="dc-del" onclick="event.stopPropagation();supprimerMandat(''+m.id+'')" title="Supprimer"><i class="ti ti-trash"></i></button>';
+      var numLabel=m.num?'<span style="font-size:10px;font-weight:700;color:var(--tc2);margin-right:5px">'+m.num+'</span>':'';
+      html+='<div class="dc-nom">'+numLabel+(m.nom||'Sans nom')+'</div>';
+      html+='<div class="dc-info">'+nbLots+' lot(s)</div>';
+      html+='<div class="dc-info" style="color:var(--text3)">'+dateCreation+'</div>';
+      if(isActive)html+='<div style="margin-top:4px;font-size:10px;color:var(--tc2);font-weight:600">✓ EN COURS</div>';
+      html+='</div>';
+    });
+    html+='</div></div>';
+  });
+  el.innerHTML=html;
+}
+
+// ── CRÉER / OUVRIR MANDAT ────────────────────────────────
+function ouvrirModalNouveauMandat(){
+  document.getElementById('new-mand-nom').value='';
+  document.getElementById('modal-nouveau-mandat').classList.add('active');
+  setTimeout(function(){document.getElementById('new-mand-nom').focus();},100);
+}
+function fermerModalNouveauMandat(){
+  document.getElementById('modal-nouveau-mandat').classList.remove('active');
+}
+
+function creerNouveauMandat(){
+  var nom=document.getElementById('new-mand-nom').value.trim();
+  var annee=document.getElementById('new-mand-annee').value;
+  if(!nom){alert('Veuillez saisir un nom.');return;}
+  var id='mand_'+Date.now();
+  allMandats[id]={
+    id:id,nom:nom,annee:annee,
+    dateCreation:Date.now(),
+    num:'',date:'',
+    mandants:[{nom:'',qualite:'',adresse:''}],
+    representant:'',
+    lots:[{id:1,desig:'',bas:'',haut:''}]
+  };
+  sauverMandatFirebase(id);
+  fermerModalNouveauMandat();
+  ouvrirMandat(id);
+  renderListeMandats();
+}
+
+function ouvrirMandat(id){
+  currentMandatId=id;
+  var m=allMandats[id];
+  if(!m)return;
+  // Remplir le formulaire
+  document.getElementById('mand-num').value=m.num||'';
+  document.getElementById('mand-date').value=m.date||'';
+  document.getElementById('mand-representant').value=m.representant||'';
+  mandatMandants=m.mandants&&m.mandants.length?JSON.parse(JSON.stringify(m.mandants)):[{nom:'',qualite:'',adresse:''}];
+  mandatLots=m.lots&&m.lots.length?JSON.parse(JSON.stringify(m.lots)):[{id:1,desig:'',bas:'',haut:''}];
+  mandatLotId=mandatLots.reduce(function(mx,l){return Math.max(mx,l.id||0);},0);
+  renderMandants();
+  renderLotsMandat();
+  // Ouvrir la modal
+  var modal=document.getElementById('modal-mandat');
+  modal.style.display='flex';
+  renderListeMandats();
+}
+
+function fermerModalMandat(){
+  document.getElementById('modal-mandat').style.display='none';
+  currentMandatId=null;
+  renderListeMandats();
+}
+
+// ── MANDANTS ─────────────────────────────────────────────
+function renderMandants(){
+  var el=document.getElementById('mandants-liste');
+  var html='';
+  mandatMandants.forEach(function(man,i){
+    html+='<div style="border:1px solid var(--border);border-radius:var(--radius);padding:10px;margin-bottom:8px;position:relative">';
+    if(mandatMandants.length>1) html+='<button onclick="supprimerMandant('+i+')" style="position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;color:#c0392b;font-size:13px"><i class="ti ti-x"></i></button>';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+    html+='<div class="fg"><label>Nom complet</label><input value="'+esc2(man.nom||'')+'" oninput="mandatMandants['+i+'].nom=this.value" placeholder="M. Jean DUPONT"/></div>';
+    html+='<div class="fg"><label>Qualité</label><input value="'+esc2(man.qualite||'')+'" oninput="mandatMandants['+i+'].qualite=this.value" placeholder="retraité, héritier…"/></div>';
+    html+='</div>';
+    html+='<div class="fg" style="margin-top:6px"><label>Adresse</label><input value="'+esc2(man.adresse||'')+'" oninput="mandatMandants['+i+'].adresse=this.value" placeholder="Adresse complète"/></div>';
+    html+='</div>';
+  });
+  el.innerHTML=html;
+}
+function ajouterMandant(){
+  mandatMandants.push({nom:'',qualite:'',adresse:''});
+  renderMandants();
+}
+function supprimerMandant(i){
+  mandatMandants.splice(i,1);
+  renderMandants();
+}
+
+// ── LOTS MANDAT ──────────────────────────────────────────
+function renderLotsMandat(){
+  var tbody=document.getElementById('mandat-lots-body');
+  var html='';
+  mandatLots.forEach(function(lot,i){
+    html+='<tr>';
+    html+='<td class="num">'+(i+1)+'</td>';
+    html+='<td><textarea data-li="'+i+'" data-f="desig" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;resize:none;overflow:hidden;line-height:1.5;padding:2px 3px;outline:none;min-height:26px">'+esc2(lot.desig||'')+'</textarea></td>';
+    html+='<td><input type="text" inputmode="decimal" data-li="'+i+'" data-f="bas" value="'+esc2(lot.bas||'')+'" oninput="updateLotMandat('+i+','bas',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;text-align:right;outline:none;padding:2px 3px"/></td>';
+    html+='<td><input type="text" inputmode="decimal" data-li="'+i+'" data-f="haut" value="'+esc2(lot.haut||'')+'" oninput="updateLotMandat('+i+','haut',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;text-align:right;outline:none;padding:2px 3px"/></td>';
+    html+='<td style="text-align:center"><button class="btn-del" onclick="supprimerLotMandat('+i+')"><i class="ti ti-x"></i></button></td>';
+    html+='</tr>';
+  });
+  tbody.innerHTML=html;
+  // Auto-resize textareas
+  tbody.querySelectorAll('textarea').forEach(function(ta){
+    ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';
+    ta.addEventListener('input',function(){
+      var i2=parseInt(this.dataset.li);
+      mandatLots[i2].desig=this.value;
+      this.style.height='auto';this.style.height=this.scrollHeight+'px';
+    });
+  });
+  updateTotauxMandat();
+}
+
+function ajouterLotMandat(){
+  mandatLots.push({id:++mandatLotId,desig:'',bas:'',haut:''});
+  renderLotsMandat();
+}
+function supprimerLotMandat(i){
+  mandatLots.splice(i,1);
+  renderLotsMandat();
+}
+function updateLotMandat(i,field,val){
+  mandatLots[i][field]=val;
+  updateTotauxMandat();
+}
+function updateTotauxMandat(){
+  var bas=0,haut=0;
+  mandatLots.forEach(function(l){
+    bas+=parseFloat((l.bas||'').toString().replace(',','.'))||0;
+    haut+=parseFloat((l.haut||'').toString().replace(',','.'))||0;
+  });
+  document.getElementById('mand-total-bas').textContent=bas.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+  document.getElementById('mand-total-haut').textContent=haut.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+}
+
+// ── SAUVEGARDER ──────────────────────────────────────────
+function sauverMandat(){
+  if(!currentMandatId)return;
+  var m=allMandats[currentMandatId];
+  m.num=document.getElementById('mand-num').value.trim();
+  m.date=document.getElementById('mand-date').value;
+  m.representant=document.getElementById('mand-representant').value.trim();
+  m.mandants=JSON.parse(JSON.stringify(mandatMandants));
+  m.lots=JSON.parse(JSON.stringify(mandatLots));
+  sauverMandatFirebase(currentMandatId);
+  renderListeMandats();
+  alert('Mandat sauvegardé !');
+}
+
+function supprimerMandat(id){
+  if(!confirm('Supprimer ce mandat ?'))return;
+  supprimerMandatFirebase(id);
+  delete allMandats[id];
+  if(currentMandatId===id){fermerModalMandat();}
+  renderListeMandats();
+}
+
+function esc2(s){return(s||'').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+
+// ── EXPORT PDF MANDAT ────────────────────────────────────
+function exportMandatPDF(){
+  if(!currentMandatId){alert('Aucun mandat ouvert.');return;}
+  var m=allMandats[currentMandatId];
+  if(!m){return;}
+  // Mettre à jour depuis le formulaire avant export
+  m.num=document.getElementById('mand-num').value.trim();
+  m.date=document.getElementById('mand-date').value;
+  m.representant=document.getElementById('mand-representant').value.trim();
+  m.mandants=JSON.parse(JSON.stringify(mandatMandants));
+  m.lots=JSON.parse(JSON.stringify(mandatLots));
+
+  if(!window.jspdf){alert('Chargement de la librairie PDF en cours, réessayez dans quelques secondes.');return;}
+  var doc=new window.jspdf.jsPDF({unit:'mm',format:'a4'});
+  var MG=12,CW=186,y=10;
+  var TC1=[122,46,26],TC2=[160,80,40],TC4=[210,170,140],TC5=[253,245,238],WHITE=[255,255,255],BLACK=[30,20,10],GREY=[250,246,242];
+
+  function fill(c){doc.setFillColor(c[0],c[1],c[2]);}
+  function drw(c){doc.setDrawColor(c[0],c[1],c[2]);}
+  function lw(n){doc.setLineWidth(n);}
+  function sf(bold,size,c){doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(size);doc.setTextColor(c[0],c[1],c[2]);}
+  function fm(n){return parseFloat(n)||0;}
+
+  // EN-TÊTE PARCS ENCHERES
+  fill(TC5);doc.rect(MG,y,CW,26,'F');
+  drw(TC4);lw(0.5);doc.rect(MG,y,CW,26,'S');
+  sf(true,16,TC1);doc.text('PARCS ENCHÈRES',MG+4,y+9);
+  sf(false,8,TC2);doc.text('Opérateur de ventes volontaires',MG+4,y+14);
+  sf(false,7.5,BLACK);doc.text('ZI St Mitre, RN8  13400 Aubagne  |  04 42 84 07 38  |  www.parcsencheres.com',MG+4,y+19);
+  sf(false,7,TC2);doc.text('N° TVA IC : FR52 918 901 836  -  SIREN : 918 901 836',MG+4,y+23.5);
+  y+=32;
+
+  // TITRE
+  fill(TC1);doc.rect(MG,y,CW,10,'F');
+  sf(true,13,WHITE);doc.text('MANDAT DE VENTE VOLONTAIRE',MG+CW/2,y+7,{align:'center'});
+  y+=15;
+
+  // INFOS MANDAT
+  var dateStr='';
+  if(m.date){var d=new Date(m.date);dateStr=d.toLocaleDateString('fr-FR');}
+  if(m.num||dateStr){
+    fill(TC5);doc.rect(MG,y,CW,8,'F');
+    drw(TC4);lw(0.2);doc.rect(MG,y,CW,8,'S');
+    sf(true,8,TC2);doc.text('Réf. :',MG+2,y+5.5);
+    sf(false,8,BLACK);doc.text(m.num||'',MG+15,y+5.5);
+    sf(true,8,TC2);doc.text('Date :',MG+CW/2,y+5.5);
+    sf(false,8,BLACK);doc.text(dateStr,MG+CW/2+12,y+5.5);
+    y+=12;
+  }
+
+  // TEXTE INTRODUCTIF
+  var mandantsTexte='';
+  if(m.mandants&&m.mandants.length){
+    var parts=m.mandants.map(function(man){
+      var t=man.nom||'';
+      if(man.qualite)t+=', '+man.qualite;
+      if(man.adresse)t+=', demeurant '+man.adresse;
+      return t;
+    });
+    mandantsTexte=parts.join(' et ');
+  }
+  if(m.representant){mandantsTexte+=' ; représentés par '+m.representant;}
+  mandantsTexte+='\n\nAutorisent la SAS PARCS ENCHERES, Opérateur de Ventes Volontaires sis à AUBAGNE 13400, RN8, ZI St Mître à organiser la vente aux enchères publiques des biens et objets mobiliers désignés au présent document et d'engager les frais ci-dessous :';
+
+  sf(false,8.5,BLACK);
+  var texteLines=doc.splitTextToSize(mandantsTexte,CW);
+  doc.text(texteLines,MG,y);
+  y+=texteLines.length*4.5+6;
+
+  // TABLEAU LOTS
+  var tdata=m.lots.map(function(l,i){return[String(i+1),l.desig||'',l.bas?(fm(l.bas).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'):'',l.haut?(fm(l.haut).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €'):''];});
+
+  doc.autoTable({
+    startY:y,
+    margin:{left:MG,right:MG},
+    tableWidth:CW,
+    head:[['LOT','Désignation','Estimation basse (€)','Estimation haute (€)']],
+    body:tdata,
+    rowPageBreak:'avoid',
+    styles:{fontSize:8,cellPadding:2.5,textColor:BLACK,lineColor:TC4,lineWidth:0.2,overflow:'linebreak',valign:'top'},
+    headStyles:{fillColor:TC1,textColor:WHITE,fontStyle:'bold',fontSize:8.5},
+    alternateRowStyles:{fillColor:TC5},
+    columnStyles:{
+      0:{cellWidth:12,halign:'center'},
+      1:{cellWidth:120,overflow:'linebreak'},
+      2:{cellWidth:27,halign:'right'},
+      3:{cellWidth:27,halign:'right'},
+    }
+  });
+  y=doc.lastAutoTable.finalY+4;
+
+  // TOTAL
+  var totBas=m.lots.reduce(function(s,l){return s+(fm(l.bas)||0);},0);
+  var totHaut=m.lots.reduce(function(s,l){return s+(fm(l.haut)||0);},0);
+  fill(TC1);doc.rect(MG,y,CW,8,'F');
+  sf(true,9,WHITE);
+  doc.text('TOTAL ESTIMATIONS',MG+3,y+5.5);
+  doc.text(totBas.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €',MG+CW-27,y+5.5,{align:'right'});
+  doc.text(totHaut.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €',MG+CW-1,y+5.5,{align:'right'});
+  y+=14;
+
+  // DATE ET SIGNATURE
+  if(y>240){doc.addPage();y=16;}
+  sf(false,8.5,BLACK);doc.text('Fait à Aubagne',MG,y);y+=5;
+  doc.text('Le '+dateStr,MG,y);y+=10;
+  doc.text('Date et signature :',MG,y);y+=16;
+
+  // CONDITIONS GÉNÉRALES
+  if(y>240){doc.addPage();y=16;}
+  fill(TC1);doc.rect(MG,y,CW,8,'F');
+  sf(true,10,WHITE);doc.text('CONDITIONS GÉNÉRALES',MG+CW/2,y+5.5,{align:'center'});
+  y+=10;
+
+  var cgv=[
+    'Prière de nous retourner ce contrat signé avant la vente, de conserver le duplicata, et de nous envoyer impérativement une photocopie de votre pièce d'identité (CNI ou passeport) ainsi que votre RIB.',
+    '',
+    'Dans le cadre de nos activités de ventes aux enchères publiques, la SAS PARCS ENCHERES est amenée à collecter des données à caractère personnel. Que vous soyez vendeur potentiel ou acheteur potentiel, vous disposez dès lors d'un droit d'accès, de rectification et d'opposition sur vos données personnelles en vous adressant par tout moyen directement à PARCS ENCHERES. Nous pourrons utiliser ces données afin de satisfaire à nos obligations légales et aux fins d'exercice de notre activité. Ces données pourront également être communiquées aux autorités compétentes dès lors que la règlementation l'impose.',
+    '',
+    'Règlement du produit net : 30/60 jours après la vente.',
+    'Le règlement pourra se trouver différé en cas de préemption par l'État ou d'achat étranger.',
+    'SAS PARCS ENCHÈRES OVV sera tenue de payer le vendeur lorsqu'elle aura été réglée par l'adjudicataire.',
+    '',
+    'IMPORTANT : Sans instructions particulières de votre part, ces objets seront vendus au plus offrant et dernier enchérisseur.',
+    'En application de la loi du 10/07/2000, le prix de réserve ne peut être supérieur à l'estimation basse.',
+    'Seuls les lots dont l'estimation basse est supérieure ou égale à 200 € pourront faire l'objet d'un prix de réserve. La réserve s'entend à 10% près.',
+    'En cas d'invendus, SAS PARCS ENCHÈRES OVV se réserve le droit de vendre les lots de gré à gré ou de les présenter à nouveau.'
+  ];
+
+  sf(false,7.5,BLACK);
+  cgv.forEach(function(line){
+    if(y>282){doc.addPage();y=16;}
+    if(!line){y+=2;return;}
+    var w=doc.splitTextToSize(line,CW);
+    doc.text(w,MG,y);
+    y+=w.length*4+1;
+  });
+
+  // Pied de page
+  sf(false,7,TC2);
+  doc.text('N° TVA IC : FR52 918 901 836 - SIREN : 918 901 836 - www.parcsencheres.com',MG+CW/2,290,{align:'center'});
+
+  var nomFichier='Mandat_'+(m.nom||'vente').replace(/\s+/g,'_')+(m.num?'_'+m.num:'')+'.pdf';
+  doc.save(nomFichier);
+}
+
+// Initialiser les mandats après connexion Firebase
+document.addEventListener('DOMContentLoaded',function(){
+  setTimeout(function(){
+    if(typeof firebase!=='undefined'&&firebase.auth){
+      firebase.auth().onAuthStateChanged(function(user){
+        if(user){chargerMandatsFirebase();}
+      });
+    }
+  },2000);
+});
 </script>
 
 </body>
