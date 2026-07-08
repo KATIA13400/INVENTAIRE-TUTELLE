@@ -3062,15 +3062,19 @@ function renderLotsMandat(){
     html+='<tr>';
     html+='<td class="num">'+(i+1)+'</td>';
     html+='<td><textarea data-li="'+i+'" data-f="desig" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;resize:none;overflow:hidden;line-height:1.5;padding:2px 3px;outline:none;min-height:26px">'+esc2(lot.desig||'')+'</textarea></td>';
-    html+='<td><input type="text" inputmode="decimal" data-li="'+i+'" data-f="bas" value="'+esc2(lot.bas||'')+'" oninput="updateLotMandat('+i+',\'bas\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;text-align:right;outline:none;padding:2px 3px"/></td>';
-    html+='<td><input type="text" inputmode="decimal" data-li="'+i+'" data-f="haut" value="'+esc2(lot.haut||'')+'" oninput="updateLotMandat('+i+',\'haut\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;text-align:right;outline:none;padding:2px 3px"/></td>';
+    html+='<td><input type="text" inputmode="decimal" placeholder="0,00" data-li="'+i+'" data-f="bas" value="'+esc2(lot.bas||'')+'" oninput="updateLotMandat('+i+',\'bas\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:1px dashed #d8c3b5;border-radius:4px;background:#fffdfb;text-align:right;outline:none;padding:3px 5px"/></td>';
+    html+='<td><input type="text" inputmode="decimal" placeholder="0,00" data-li="'+i+'" data-f="haut" value="'+esc2(lot.haut||'')+'" oninput="updateLotMandat('+i+',\'haut\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:1px dashed #d8c3b5;border-radius:4px;background:#fffdfb;text-align:right;outline:none;padding:3px 5px"/></td>';
     html+='<td style="text-align:center"><button class="btn-del" onclick="supprimerLotMandat('+i+')"><i class="ti ti-x"></i></button></td>';
     html+='</tr>';
   });
   tbody.innerHTML=html;
-  // Auto-resize textareas
+  // Auto-resize textareas (différé pour laisser le temps au modal d'être visible)
+  requestAnimationFrame(function(){
+    tbody.querySelectorAll('textarea').forEach(function(ta){
+      ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';
+    });
+  });
   tbody.querySelectorAll('textarea').forEach(function(ta){
-    ta.style.height='auto';ta.style.height=ta.scrollHeight+'px';
     ta.addEventListener('input',function(){
       var i2=parseInt(this.dataset.li);
       mandatLots[i2].desig=this.value;
