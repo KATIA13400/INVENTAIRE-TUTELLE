@@ -2959,8 +2959,8 @@ function renderListeMandats(){
       var isActive=m.id===currentMandatId;
       var nbLots=m.lots?m.lots.length:0;
       var dateCreation=m.dateCreation?new Date(m.dateCreation).toLocaleDateString('fr-FR'):'';
-      html+='<div class="dossier-card'+(isActive?' active':'')+'" onclick="ouvrirMandat(''+m.id+'')">';
-      html+='<button class="dc-del" onclick="event.stopPropagation();supprimerMandat(''+m.id+'')" title="Supprimer"><i class="ti ti-trash"></i></button>';
+ html+='<div class="dossier-card'+(isActive?' active':'')+'" onclick="ouvrirMandat(\''+m.id+'\')">';
+html+='<button class="dc-del" onclick="event.stopPropagation();supprimerMandat(\''+m.id+'\')" title="Supprimer"><i class="ti ti-trash"></i></button>';
       var numLabel=m.num?'<span style="font-size:10px;font-weight:700;color:var(--tc2);margin-right:5px">'+m.num+'</span>':'';
       html+='<div class="dc-nom">'+numLabel+(m.nom||'Sans nom')+'</div>';
       html+='<div class="dc-info">'+nbLots+' lot(s)</div>';
