@@ -2580,41 +2580,53 @@ async function fbSupprimerPhotoDossier(dossierId){
 async function fbChargerPhotos(dossierId,callback){
   if(!dossierId){if(callback)callback({});return;}
   var loaded={};
+  // Cache local (cet appareil) — indexé par photoId pour pouvoir le croiser avec les métadonnées partagées
   var prefix='photo_'+dossierId+'_';
   var entries=await idbGetAllByPrefix(prefix);
+  var cacheByPhotoId={};
   entries.forEach(function(entry){
     var meta=entry.value&&entry.value.meta;
     var src=entry.value&&entry.value.src;
-    if(!meta||!src)return;
-    var rid=String(meta.rowId);
-    if(!loaded[rid])loaded[rid]=[];
-    loaded[rid].push({id:meta.id,src:src,label:meta.label||''});
+    if(meta&&src)cacheByPhotoId[meta.id]=src;
   });
-  if(Object.keys(loaded).length>0){
-    if(callback)callback(loaded);
-    return;
-  }
-  if(gdriveAccessToken){
-    try{
-      var snap=await fbdb.ref('photometa/'+dossierId).once('value');
-      var metaData=snap.val()||{};
-      for(var rowId in metaData){
-        for(var photoId in metaData[rowId]){
-          var m=metaData[rowId][photoId];
-          if(!m.driveFileId)continue;
-          try{
-            var r=await fetch('https://www.googleapis.com/drive/v3/files/'+m.driveFileId+'?alt=media',{headers:{'Authorization':'Bearer '+gdriveAccessToken}});
-            if(!r.ok)continue;
-            var b=await r.blob();
-            var s=await new Promise(function(res){var fr=new FileReader();fr.onload=function(){res(fr.result);};fr.readAsDataURL(b);});
-            var rid2=String(m.rowId);
-            if(!loaded[rid2])loaded[rid2]=[];
-            loaded[rid2].push({id:m.id,src:s,label:m.label||''});
-            await idbSet('photo_'+dossierId+'_'+m.rowId+'_'+m.id,{meta:m,src:s});
-          }catch(e){}
-        }
+  // Métadonnées Firebase = source de vérité partagée entre les deux comptes
+  var metaData={};
+  try{
+    var snap=await fbdb.ref('photometa/'+dossierId).once('value');
+    metaData=snap.val()||{};
+  }catch(e){console.warn('Chargement métadonnées photos:',e);}
+  var aTelecharger=[];
+  for(var rowId in metaData){
+    for(var photoId in metaData[rowId]){
+      var m=metaData[rowId][photoId];
+      var rid=String(m.rowId);
+      var srcCache=cacheByPhotoId[photoId];
+      if(srcCache){
+        if(!loaded[rid])loaded[rid]=[];
+        loaded[rid].push({id:m.id,src:srcCache,label:m.label||''});
+      } else if(m.driveFileId){
+        aTelecharger.push(m);
       }
-    }catch(e){console.warn('Chargement photos Drive:',e);}
+    }
+  }
+  if(aTelecharger.length>0){
+    if(gdriveAccessToken){
+      for(var i=0;i<aTelecharger.length;i++){
+        var m2=aTelecharger[i];
+        try{
+          var r=await fetch('https://www.googleapis.com/drive/v3/files/'+m2.driveFileId+'?alt=media',{headers:{'Authorization':'Bearer '+gdriveAccessToken}});
+          if(!r.ok)continue;
+          var b=await r.blob();
+          var s=await new Promise(function(res){var fr=new FileReader();fr.onload=function(){res(fr.result);};fr.readAsDataURL(b);});
+          var rid2=String(m2.rowId);
+          if(!loaded[rid2])loaded[rid2]=[];
+          loaded[rid2].push({id:m2.id,src:s,label:m2.label||''});
+          await idbSet('photo_'+dossierId+'_'+m2.rowId+'_'+m2.id,{meta:m2,src:s});
+        }catch(e){}
+      }
+    } else {
+      showDriveReconnect();
+    }
   }
   if(callback)callback(loaded);
 }
