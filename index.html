@@ -1064,7 +1064,7 @@ function fd(d){
   return j+'/'+m+'/'+y;
 }
 function fnum(n){
-  const v=parseFloat(n)||0;
+  const v=parseFloat(String(n||0).replace(/\s/g,'').replace(',','.'))||0;
   const ent=Math.floor(v);
   const dec=Math.round((v-ent)*100).toString().padStart(2,'0');
   const s=ent.toString();
@@ -1396,7 +1396,7 @@ async function exportExcel(){
   }
   const h=getH();const{bas,haut}=getTotals();const wb=XLSX.utils.book_new();
   const wd=[['PROCÈS-VERBAL D\'INVENTAIRE JUDICIAIRE — '+h.dosType],[],['Commissaire de Justice :','Maître Katia FAGIANO','','N° Inventaire :',h.dosNum],['Étude :','SELARLU FAGIANO Katia','','Date :',fd(h.dosDate)],['Protégée :',h.dosPersonne,'','Heure :',h.dosHeure],['Domicile inventorié :',h.dosAdresse,'','Type :',h.dosType],['Mandataire :',h.mandNom,'','Organisation :',h.mandOrg],['Adresse mandataire :',h.mandAdresse,'','Tribunal :',h.mandTribunal],[],['N°','Désignation du bien','Emplacement','Est. basse (€)','Est. haute (€)','Mémoire']];
-  rows.forEach((r,i)=>wd.push([i+1,r.desig||'',r.lieu||'',r.memo?'':parseFloat(r.bas)||0,r.memo?'':parseFloat(r.haut)||0,r.memo?'Mémoire':'']));
+  rows.forEach((r,i)=>wd.push([i+1,r.desig||'',r.lieu||'',r.memo?'':parseVal(r.bas),r.memo?'':parseVal(r.haut),r.memo?'Mémoire':'']));
   wd.push([],['','','TOTAL ESTIMATIONS BASSES',bas,'',''],['','','TOTAL ESTIMATIONS HAUTES','',haut,''],['','','Total basses en lettres',montantEnLettres(bas),'',''],['','','Total hautes en lettres',montantEnLettres(haut),'','']);
   const ws=XLSX.utils.aoa_to_sheet(wd);ws['!cols']=[{wch:4},{wch:55},{wch:16},{wch:16},{wch:16},{wch:10}];
   XLSX.utils.book_append_sheet(wb,ws,'Inventaire');XLSX.writeFile(wb,'Inventaire_CHEYLAN_'+(h.dosNum||'')+'.xlsx');
@@ -3099,8 +3099,8 @@ function updateLotMandat(i,field,val){
 function updateTotauxMandat(){
   var bas=0,haut=0;
   mandatLots.forEach(function(l){
-    bas+=parseFloat((l.bas||'').toString().replace(',','.'))||0;
-    haut+=parseFloat((l.haut||'').toString().replace(',','.'))||0;
+    bas+=parseFloat((l.bas||'').toString().replace(/\s/g,'').replace(',','.'))||0;
+    haut+=parseFloat((l.haut||'').toString().replace(/\s/g,'').replace(',','.'))||0;
   });
   document.getElementById('mand-total-bas').textContent=bas.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   document.getElementById('mand-total-haut').textContent=haut.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
@@ -3190,7 +3190,7 @@ function exportMandatPDF(){
   function drw(c){doc.setDrawColor(c[0],c[1],c[2]);}
   function lw(n){doc.setLineWidth(n);}
   function sf(bold,size,c){doc.setFont('helvetica',bold?'bold':'normal');doc.setFontSize(size);doc.setTextColor(c[0],c[1],c[2]);}
-  function fm(n){return parseFloat(n)||0;}
+  function fm(n){return parseFloat(String(n||'').replace(/[\s  ]/g,'').replace(',','.'))||0;}
   function fmtMontant(n){return n.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/[\u00A0\u202F]/g,' ');}
 
   // EN-TÊTE PARCS ENCHERES
