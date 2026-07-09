@@ -3283,58 +3283,96 @@ function exportMandatPDF(){
   sf(true,10,WHITE);doc.text('CONDITIONS GÉNÉRALES',MG+CW/2,y+5.5,{align:'center'});
   y+=10;
 
-  var cgv=[
-    "CONDITIONS GÉNÉRALES DE VENTE & MANDAT DE VENTE - SAS PARCS ENCHERES OVV",
-    "Agrément n° [À compléter] - Mandataire agissant pour le compte du vendeur",
+  var cgvPart1=[
+    "SAS PARCS ENCHÈRES Opérateur de Ventes Volontaires (OVV)",
+    "Agrément du Conseil des Maisons de Ventes n° 2002-263 - Mandataire agissant pour le compte du vendeur",
     "",
     "1. FRAIS, TAXES ET DISPOSITIONS PARTICULIÈRES",
     "Au prix d'adjudication (produit net de la vente), peuvent s'ajouter à la charge du vendeur les frais et taxes suivants :",
-    "- Transport et stockage : remboursement sur justificatif de la facture de transport et de garde-meubles.",
-    "- Frais annexes : frais de photographie ainsi que tout autre frais direct de gestion de la vente.",
-    "- Droit de suite & reproduction : conformément à la loi du 11.03.57, le droit de suite sera versé à l'artiste ou à ses héritiers, ainsi que les droits de reproduction éventuels. Taux dégressif par tranche du prix :",
-    "   . 4% jusqu'à 50 000 €",
-    "   . 3% de 50 000,01 € à 200 000 €",
-    "   . 1% de 200 000,01 € à 350 000 €",
-    "   . 0,5% de 350 000,01 € à 500 000 €",
-    "   . 0,25% au-delà de 500 000,01 €",
-    "- Contrôle des métaux précieux : forfait de 10 € HT par article pour le contrôle et le poinçonnage.",
+    "- Transport et stockage : le remboursement sur justificatif de la facture de transport et de garde-meubles.",
+    "- Frais annexes : les frais de photographie ainsi que tout autre frais direct de gestion de la vente.",
+    "- Droit de suite & reproduction : conformément à la législation en vigueur (loi du 11.03.57), le droit de suite sera versé à l'artiste ou à ses héritiers, ainsi que les droits de reproduction éventuels. Le taux du droit de suite est calculé par tranche dégressive comme suit :",
+    "   . 4 % pour la tranche du prix jusqu'à 50 000 €",
+    "   . 3 % pour la tranche du prix comprise entre 50 000,01 € et 200 000 €",
+    "   . 1 % pour la tranche du prix comprise entre 200 000,01 € et 350 000 €",
+    "   . 0,5 % pour la tranche du prix comprise entre 350 000,01 € et 500 000 €",
+    "   . 0,25 % pour la tranche du prix excédant 500 000,01 €",
+    "- Contrôle des métaux précieux : les frais de contrôle et de poinçonnage sur les métaux précieux s'élèvent à un forfait de 10 € HT par article.",
     "",
     "2. RÉGIME FISCAL DES MÉTAUX PRÉCIEUX & OBJETS D'ART",
-    "Conformément à la réglementation fiscale française, la SAS PARCS ENCHERES OVV agit en qualité de collecteur d'impôt. Les taxes dues seront retenues d'office sur le produit de la vente et reversées à l'administration fiscale.",
-    "- Métaux précieux (lingots, barres, pièces d'or/argent post-1800) - Régime forfaitaire par défaut : taxe forfaitaire de 11,5% au total (11% de taxe sur les métaux précieux + 0,5% de CRDS), assise sur le prix d'adjudication brut, dès le premier euro.",
-    "- Métaux précieux - Option régime des plus-values (TPV) : taxe de 37,6% (19% d'impôt sur la plus-value + 18,6% de prélèvements sociaux incluant CSG et CRDS) appliquée uniquement sur la plus-value réelle. Abattement de 5% par an à partir de la 3e année (exonération totale après 22 ans). Justificatif d'acquisition nominatif obligatoire.",
-    "- Bijoux, objets d'art, de collection ou d'antiquité - Régime forfaitaire par défaut : taxe forfaitaire de 6,5% (6% de taxe + 0,5% de CRDS) applicable uniquement sur chaque adjudication supérieure à 5 000 €.",
-    "- Bijoux, objets d'art - Option plus-value réelle : taxe au taux de droit commun, sous réserve d'opter expressément avant la vente et de fournir un justificatif de propriété nominatif et probant (facture nominative, acte de succession ou de donation permettant de justifier d'une propriété de plus de 22 ans pour exonération totale).",
-    "",
+    "Conformément à la réglementation fiscale française, la SAS PARCS ENCHÈRES OVV agit en qualité de collecteur d'impôt. Les taxes dues seront retenues d'office sur le produit de la vente et reversées à l'administration fiscale."
+  ];
+
+  sf(false,7.5,BLACK);
+  cgvPart1.forEach(function(line){
+    if(y>282){doc.addPage();y=16;}
+    if(!line){y+=2;return;}
+    var w=doc.splitTextToSize(line,CW);
+    doc.text(w,MG,y);
+    y+=w.length*4+1;
+  });
+  y+=2;
+
+  // TABLEAU RÉGIME FISCAL MÉTAUX PRÉCIEUX / OBJETS D'ART
+  if(y>230){doc.addPage();y=16;}
+  doc.autoTable({
+    startY:y,
+    margin:{left:MG,right:MG},
+    tableWidth:CW,
+    head:[['Catégorie de biens','Régime Forfaitaire (Par défaut)','Option : Régime des Plus-Values (TPV)']],
+    body:[
+      [
+        "Métaux Précieux\n(Lingots, barres, pièces d'or/argent post-1800)",
+        "Taxe forfaitaire de 11,5 % au total (11 % de taxe sur les métaux précieux + 0,5 % de CRDS) assise sur le prix d'adjudication brut, dès le premier euro.",
+        "Taxe de 37,6 % (19 % d'impôt sur la plus-value + 18,6 % de prélèvements sociaux incluant CSG et CRDS) appliquée uniquement sur la plus-value réelle. Abattement de 5 % par an à partir de la 3e année (exonération totale après 22 ans). Justificatif d'acquisition nominatif obligatoire."
+      ],
+      [
+        "Bijoux, Objets d'Art, de Collection ou d'Antiquité",
+        "Taxe forfaitaire de 6,5 % (6 % de taxe + 0,5 % de CRDS) applicable uniquement sur chaque adjudication supérieure à 5 000 €.",
+        "Taxe sur la plus-value réelle au taux de droit commun, sous réserve d'opter expressément avant la vente et de fournir un justificatif de propriété nominatif et probant établissant le prix et la date d'acquisition (facture nominative, acte de succession, ou acte de donation permettant de justifier d'une propriété de plus de 22 ans pour exonération totale)."
+      ]
+    ],
+    styles:{fontSize:7,cellPadding:2,textColor:BLACK,lineColor:TC4,lineWidth:0.2,overflow:'linebreak',valign:'top'},
+    headStyles:{fillColor:TC1,textColor:WHITE,fontStyle:'bold',fontSize:7.5,valign:'middle'},
+    alternateRowStyles:{fillColor:TC5},
+    columnStyles:{
+      0:{cellWidth:34,fontStyle:'bold'},
+      1:{cellWidth:76},
+      2:{cellWidth:76}
+    }
+  });
+  y=doc.lastAutoTable.finalY+5;
+
+  var cgvPart2=[
     "Choix de l'option fiscale par le Mandant (uniquement en cas de présentation de justificatifs valides) :",
     "[  ] Je souhaite appliquer le régime forfaitaire par défaut.",
     "[  ] Je souhaite opter pour le régime des plus-values réelles et fournis les justificatifs requis.",
     "",
     "3. RÉGIME DE TVA DU VENDEUR",
     "Le Mandant doit obligatoirement déclarer sa situation au regard de la TVA en cochant la case correspondante ci-dessous :",
-    "[  ] 1. Vendeur particulier",
+    "[  ] 1. VENDEUR PARTICULIER",
     "[  ] 2. Vendeur redevable de la T.V.A. française au titre de la vente (merci de joindre impérativement un extrait Kbis récent).",
     "[  ] 3. Vendeur identifié à la T.V.A. dans un autre État membre de la C.E.E. sous le N° : ______________________ et s'engage à remplir sous sa seule responsabilité les obligations fiscales en résultant.",
-    "La SAS PARCS ENCHERES OVV, étant un mandataire agissant pour le compte du vendeur, décline toute responsabilité quant aux conséquences juridiques et fiscales d'une fausse déclaration ou du non-paiement de la T.V.A. auprès des autorités fiscales compétentes.",
+    "La SAS PARCS ENCHÈRES OVV étant un mandataire agissant pour le compte du vendeur décline toute responsabilité quant aux conséquences juridiques et fiscales d'une fausse déclaration ou du non-paiement de la T.V.A. auprès des autorités fiscales compétentes.",
     "",
     "4. RÈGLEMENT ET MODALITÉS DE PAIEMENT",
     "- Délai standard : le règlement du produit net de la vente intervient dans un délai de 30 à 60 jours après la clôture de la vente.",
-    "- Règlement subordonné : conformément à la législation, la SAS PARCS ENCHERES OVV n'est tenue de payer le vendeur qu'à la condition d'avoir elle-même été effectivement et intégralement réglée par l'adjudicataire.",
+    "- Règlement subordonné : conformément à la législation, la SAS PARCS ENCHÈRES n'est tenue de payer le vendeur qu'à la condition d'avoir elle-même été effectivement et intégralement réglée par l'adjudicataire.",
     "- Délais spécifiques : le règlement pourra se trouver légitimement différé en cas d'exercice du droit de préemption par l'État français ou en cas de formalités d'exportation liées à un achat étranger.",
     "",
     "5. CONDITIONS DE MISE EN VENTE ET INVENDUS (IMPORTANT)",
     "Sauf instructions contraires et particulières écrites de votre part, les règles suivantes s'appliquent d'office :",
     "- Absence de prix de réserve : à défaut d'instruction, les objets seront vendus au plus offrant et dernier enchérisseur.",
-    "- Fixation de la réserve : en application de la loi du 10/07/2000, le prix de réserve conventionnel ne peut en aucun cas être supérieur à l'estimation basse fixée par l'O.V.V. Seuls les lots dont l'estimation basse est supérieure ou égale à 200 € pourront faire l'objet d'un prix de réserve. La réserve acceptée s'entend à 10% près par rapport au montant indiqué.",
-    "- Gestion des invendus : en cas d'invendus à la criée, la SAS PARCS ENCHERES OVV se réserve expressément le droit de vendre les lots de gré à gré (après-vente) au prix de la réserve, ou de les présenter à nouveau dans une prochaine vente aux enchères publique.",
-    "- Droit de rétractation (Loi Hamon / Code de la consommation) : en cas de signature du présent mandat à distance ou hors établissement, le Mandant particulier demande expressément l'exécution immédiate des prestations de services de la SAS PARCS ENCHERES OVV avant la fin du délai légal de rétractation de quatorze (14) jours. Le Mandant reconnaît et accepte expressément qu'il renonce définitivement à son droit de rétractation à compter de l'adjudication publique du ou des lots concernés.",
+    "- Fixation de la réserve : en application de la loi du 10/07/2000, le prix de réserve conventionnel ne peut en aucun cas être supérieur à l'estimation basse fixée par l'O.V.V. Seuls les lots dont l'estimation basse est supérieure ou égale à 200 € pourront faire l'objet d'un prix de réserve. La réserve acceptée s'entend à 10 % près par rapport au montant indiqué.",
+    "- Gestion des invendus : en cas d'invendus à la criée, la SAS PARCS ENCHERES se réserve expressément le droit de vendre les lots de gré à gré (après-vente / aftersale) au prix de la réserve, ou de les présenter à nouveau dans une prochaine vente aux enchères publique.",
+    "- Droit de rétractation (Loi Hamon / Code de la consommation) : en cas de signature du présent mandat à distance ou hors établissement, le Mandant particulier demande expressément l'exécution immédiate des prestations de services de la SAS PARCS ENCHÈRES avant la fin du délai légal de rétractation de quatorze (14) jours. Le Mandant reconnaît et accepte expressément qu'il renonce définitivement à son droit de rétractation à compter de l'adjudication publique du ou des lots concernés.",
     "",
-    "Fait à ______________________, le ______________________",
+    "Fait à ______________________, le ____________________",
     "Signature du Mandant (précédée de la mention manuscrite \"Bon pour accord et mandat de vente\") :"
   ];
 
   sf(false,7.5,BLACK);
-  cgv.forEach(function(line){
+  cgvPart2.forEach(function(line){
     if(y>282){doc.addPage();y=16;}
     if(!line){y+=2;return;}
     var w=doc.splitTextToSize(line,CW);
