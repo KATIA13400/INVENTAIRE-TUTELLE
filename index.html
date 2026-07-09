@@ -832,6 +832,7 @@ function updateDriveStatus(){
       <div class="fg"><label>Couleur</label><input id="veh-couleur"/></div>
       <div class="fg"><label>Kilométrage</label><input type="number" id="veh-kms" min="0" step="1"/></div>
       <div class="fg"><label>Nombre de sièges</label><input type="number" id="veh-sieges" min="0" step="1"/></div>
+      <div class="fg"><label>Estimation réalisée par</label><input id="veh-realise-par" placeholder="Maître Katia FAGIANO"/></div>
     </div>
   </div>
 
@@ -867,6 +868,9 @@ function updateDriveStatus(){
     </div>
     <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-top:8px">
       <input type="checkbox" id="veh-proposer-abandon" style="width:14px;height:14px;cursor:pointer"/> Proposer l'abandon du véhicule (faible valeur vénale)
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-top:8px">
+      <input type="checkbox" id="veh-mention-vente" style="width:14px;height:14px;cursor:pointer"/> Insérer la mention "vente aux enchères" (déductions à prévoir)
     </label>
   </div>
 </div>
@@ -2119,8 +2123,8 @@ function ouvrirModalNouveauDossier(estimVehicule){
 
 function vehiculeParDefaut(){
   return {marque:'',modele:'',immat:'',dateCirculation:'',portes:'',energie:'',couleur:'',
-    kms:'',sieges:'',equipements:{},etat:'',ficheIdentif:false,carteGrise:false,
-    remarques:'',descriptionEtat:'',proposerAbandon:false,estimation:'',dommages:[]};
+    kms:'',sieges:'',realisePar:'',equipements:{},etat:'',ficheIdentif:false,carteGrise:false,
+    remarques:'',descriptionEtat:'',proposerAbandon:false,mentionVente:false,estimation:'',dommages:[]};
 }
 
 var EQUIPEMENTS_VEHICULE=[
@@ -2166,12 +2170,13 @@ function getVehicule(){
     marque:v('veh-marque'),modele:v('veh-modele'),immat:v('veh-immat'),
     dateCirculation:v('veh-date-circulation'),portes:v('veh-portes'),
     energie:v('veh-energie'),couleur:v('veh-couleur'),kms:v('veh-kms'),
-    sieges:v('veh-sieges'),equipements:equipements,
+    sieges:v('veh-sieges'),realisePar:v('veh-realise-par'),equipements:equipements,
     etat:(d.vehicule&&d.vehicule.etat)||'',
     ficheIdentif:document.getElementById('veh-fiche-identif')?document.getElementById('veh-fiche-identif').checked:false,
     carteGrise:document.getElementById('veh-carte-grise')?document.getElementById('veh-carte-grise').checked:false,
     remarques:v('veh-remarques'),descriptionEtat:v('veh-description-etat'),
     proposerAbandon:document.getElementById('veh-proposer-abandon')?document.getElementById('veh-proposer-abandon').checked:false,
+    mentionVente:document.getElementById('veh-mention-vente')?document.getElementById('veh-mention-vente').checked:false,
     estimation:v('veh-estimation'),
     dommages:(d.vehicule&&d.vehicule.dommages)||[]
   };
@@ -2366,7 +2371,8 @@ async function exportEstimationVehiculePDF(){
     ['1ère mise en circulation',fd2(veh.dateCirculation),'Nb portes',veh.portes||''],
     ['Énergie',veh.energie||'','Couleur',veh.couleur||''],
     ['Kilométrage',veh.kms?veh.kms+' km':'','Nb sièges',veh.sieges||''],
-    ['N° de dossier',h.dosNum||'','Date de l\'estimation',fd2(new Date().toISOString().split('T')[0])]
+    ['N° de dossier',h.dosNum||'','Date de l\'estimation',fd2(new Date().toISOString().split('T')[0])],
+    ['Réalisée par',veh.realisePar||'Maître Katia FAGIANO','Fonction','Commissaire de Justice']
   ];
   infoR.forEach(function(row,i){
     var bg=i%2===0?GREY:TC6;
@@ -2451,16 +2457,43 @@ async function exportEstimationVehiculePDF(){
   var wRgpd=doc.splitTextToSize('"Dans le cadre de nos activités, nous sommes amenés à collecter des données à caractère personnel. Vous disposez d\'un droit d\'accès, de rectification et d\'opposition sur vos données personnelles en vous adressant par tout moyen directement à notre étude. Nous pourrons utiliser ces données afin de satisfaire à nos obligations légales et aux fins d\'exercice de notre activité. Ces données pourront également être communiquées aux autorités compétentes dès lors que la réglementation l\'impose."',CW);
   doc.text(wRgpd,MG,y);y+=wRgpd.length*3.6+10;
 
-  // ── ESTIMATION EN GROS, TOUJOURS EN DERNIER ──
-  if(y>255){doc.addPage();y=20;}
-  fill(TC1);doc.rect(MG,y,CW,20,'F');
-  sf(true,10,WHITE);doc.text('ESTIMATION (MISE À PRIX)',MG+CW/2,y+7,{align:'center'});
-  sf(true,18,WHITE);doc.text((veh.estimation||'0')+' €',MG+CW/2,y+16,{align:'center'});
-  y+=25;
+  if(veh.mentionVente){
+    if(y>240){doc.addPage();y=16;}
+    y+=2;
+    var txtVente="Si vous désirez vendre ce véhicule par notre biais aux enchères publiques, il faudrait déduire du prix d'adjudication : le coût du contrôle technique, le transport, les frais de publicité, les frais légaux de vente.";
+    var wVente=doc.splitTextToSize(txtVente,CW-14);
+    var venteH=wVente.length*5+16;
+    fill(TC5);drw(TC4);lw(0.3);doc.rect(MG,y,CW,venteH,'FD');
+    sf(true,8.5,TC1);
+    wVente.forEach(function(line,i){doc.text(line,MG+7,y+10+i*5);});
+    y+=venteH+6;
+  }
+
+  // ── ÉTAT RÉCAPITULATIF (comme les inventaires) ──
+  if(y>235){doc.addPage();y=20;}
+  else y+=2;
+  fill(TC1);doc.rect(MG,y,CW,9,'F');
+  sf(true,11,WHITE);doc.text('ÉTAT RÉCAPITULATIF',W/2,y+6,{align:'center'});
+  y+=13;
+  fill(TC5);drw(TC4);lw(0.3);
+  doc.rect(MG,y,CW-38,12,'FD');doc.rect(MG+CW-37,y,37,12,'FD');
+  sf(true,8.5,BLACK);
+  var wEstLettres=doc.splitTextToSize('ESTIMATION (MISE À PRIX) : '+montantEnLettres(veh.estimation),CW-42);
+  doc.text(wEstLettres,MG+2,y+5);
+  sf(true,15,TC1);doc.text((parseFloat(veh.estimation)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €',MG+CW-3,y+8,{align:'right'});
+  y+=16;
   sf(false,7.5,BLACK);
   var wReserve=doc.splitTextToSize("Sous réserve qu'il n'y ait pas de problèmes mécaniques majeurs au contrôle technique et expertise à venir. Durée de validité de cette estimation : 3 mois.",CW);
-  doc.text(wReserve,MG,y);y+=wReserve.length*4+5;
-  sf(true,8.5,BLACK);doc.text('Estimation réalisée par Maître Katia FAGIANO, Commissaire de Justice',MG+CW,y,{align:'right'});
+  doc.text(wReserve,MG,y);y+=wReserve.length*4+8;
+
+  // ── SIGNATURE ──
+  if(y>210){doc.addPage();y=20;}
+  sf(false,9,BLACK);doc.text('Fait à Aubagne',MG,y);y+=6;
+  doc.text('Le '+fd2(new Date().toISOString().split('T')[0]),MG,y);y+=14;
+  doc.text('Et signé après lecture,',MG,y);y+=8;
+  sf(true,11,TC1);doc.text('Maître Katia FAGIANO',MG,y);y+=2;
+  try{doc.addImage(SIG_B64,'JPEG',MG-2,y,58,44,'sig','FAST');}catch(e){console.warn('Sig:',e);}
+  y+=46;
 
   // Pied de page (mentions légales + numérotation sur toutes les pages)
   var totalPages=doc.internal.getNumberOfPages();
@@ -2580,7 +2613,7 @@ function ouvrirDossier(id){
     var veh=d.vehicule;
     var mapVeh={marque:'veh-marque',modele:'veh-modele',immat:'veh-immat',dateCirculation:'veh-date-circulation',
       portes:'veh-portes',energie:'veh-energie',couleur:'veh-couleur',kms:'veh-kms',sieges:'veh-sieges',
-      remarques:'veh-remarques',descriptionEtat:'veh-description-etat',estimation:'veh-estimation'};
+      realisePar:'veh-realise-par',remarques:'veh-remarques',descriptionEtat:'veh-description-etat',estimation:'veh-estimation'};
     Object.keys(mapVeh).forEach(function(k){
       var el=document.getElementById(mapVeh[k]);
       if(el)el.value=veh[k]!=null?veh[k]:'';
@@ -2588,6 +2621,7 @@ function ouvrirDossier(id){
     var elFiche=document.getElementById('veh-fiche-identif');if(elFiche)elFiche.checked=!!veh.ficheIdentif;
     var elCarte=document.getElementById('veh-carte-grise');if(elCarte)elCarte.checked=!!veh.carteGrise;
     var elAbandon=document.getElementById('veh-proposer-abandon');if(elAbandon)elAbandon.checked=!!veh.proposerAbandon;
+    var elMentionVente=document.getElementById('veh-mention-vente');if(elMentionVente)elMentionVente.checked=!!veh.mentionVente;
     renderVehiculeEquipements(veh);
     renderVehiculeEtatBoutons(veh);
     renderSchemaDommages();
