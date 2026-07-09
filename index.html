@@ -158,6 +158,7 @@ td textarea{overflow:hidden;line-height:1.5;min-height:28px}
 .dossier-card .dc-info{font-size:11px;color:var(--text2)}
 .dossier-card .dc-del{position:absolute;top:6px;right:6px;background:none;border:none;cursor:pointer;color:var(--text3);font-size:13px;padding:2px}
 .dossier-card .dc-del:hover{color:#c0392b}
+.dossier-card .dc-envoye{position:absolute;bottom:6px;right:6px;width:16px;height:16px;border-radius:50%;background:#2a6a3a;color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;line-height:1}
 .empty-dossiers{font-size:13px;color:var(--text3);text-align:center;padding:20px;font-style:italic}
 .modal-overlay{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center}
 .modal-overlay.active{display:flex}
@@ -256,6 +257,8 @@ function fbSauver(dossierId, dossier) {
     type: dossier.type,
     dateCreation: dossier.dateCreation,
     dateMaj: Date.now(),
+    termine: dossier.termine || false,
+    envoye: dossier.envoye || false,
     h: dossier.h || {},
     rows: (dossier.rows || []).map(function(r) {
       return {id:r.id, desig:r.desig||'', lieu:r.lieu||'', bas:r.bas||'', haut:r.haut||'', memo:r.memo||false};
@@ -604,7 +607,13 @@ function updateDriveStatus(){
 
     <!-- EN-TÊTE -->
     <div class="card" style="margin-bottom:12px">
-      <div class="section-label"><i class="ti ti-building" style="font-size:14px"></i>Informations générales</div>
+      <div class="section-label" style="justify-content:space-between">
+        <span><i class="ti ti-building" style="font-size:14px"></i>Informations générales</span>
+        <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;cursor:pointer;color:#2a6a3a;text-transform:none;letter-spacing:0">
+          <input type="checkbox" id="mand-envoye" onchange="toggleMandatEnvoye(this.checked)" style="width:14px;height:14px;cursor:pointer;accent-color:#2a6a3a"/>
+          ✓ Mandat envoyé
+        </label>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
         <div class="fg"><label>Numéro de mandat</label><input id="mand-num" placeholder="Ex: MV26001"/></div>
         <div class="fg"><label>Date</label><input id="mand-date" type="date"/></div>
@@ -748,10 +757,16 @@ function updateDriveStatus(){
 <div class="card">
   <div class="section-label" style="justify-content:space-between">
     <span><i class="ti ti-file-description" style="font-size:14px"></i>Dossier en cours</span>
-    <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;cursor:pointer;color:var(--tc1);text-transform:none;letter-spacing:0">
-      <input type="checkbox" id="dos-termine" onchange="toggleDossierTermine(this.checked)" style="width:14px;height:14px;cursor:pointer;accent-color:var(--tc1)"/>
-      ✓ Dossier terminé
-    </label>
+    <div style="display:flex;align-items:center;gap:14px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;cursor:pointer;color:#2a6a3a;text-transform:none;letter-spacing:0">
+        <input type="checkbox" id="dos-envoye" onchange="toggleDossierEnvoye(this.checked)" style="width:14px;height:14px;cursor:pointer;accent-color:#2a6a3a"/>
+        ✓ Inventaire envoyé
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;cursor:pointer;color:var(--tc1);text-transform:none;letter-spacing:0">
+        <input type="checkbox" id="dos-termine" onchange="toggleDossierTermine(this.checked)" style="width:14px;height:14px;cursor:pointer;accent-color:var(--tc1)"/>
+        ✓ Dossier terminé
+      </label>
+    </div>
   </div>
   <div class="grid3">
     <div class="fg"><label>N° d'inventaire</label><input id="dos-num" placeholder="À compléter"/></div>
@@ -1959,6 +1974,7 @@ function renderListeDossiers(){
       html+='<div class="dc-info">'+(d.type||'')+' · '+nbBiens+' bien(s)</div>';
       html+='<div class="dc-info" style="color:var(--text3)">'+dateCreation+'</div>';
       if(isActive)html+='<div style="margin-top:4px;font-size:10px;color:var(--tc2);font-weight:600">✓ EN COURS</div>';
+      if(d.envoye)html+='<div class="dc-envoye" title="Inventaire envoyé"><i class="ti ti-check"></i></div>';
       html+='</div>';
     });
     html+='</div></div>';
@@ -2066,6 +2082,7 @@ function ouvrirDossier(id){
     syncRowPhotosToGallery();
   });
   updateTermineCheckbox();
+  updateEnvoyeCheckbox();
   
   // Mettre à jour le badge
   const badge=document.getElementById('badge-dossier-actif');
@@ -2676,6 +2693,23 @@ function updateTermineCheckbox(){
   var d = allDossiers[currentDossierId];
   chk.checked = d && d.termine ? true : false;
 }
+
+// ── INVENTAIRE ENVOYÉ ─────────────────────────────────────────────────────
+function toggleDossierEnvoye(checked){
+  if(!currentDossierId) return;
+  if(allDossiers[currentDossierId]){
+    allDossiers[currentDossierId].envoye = checked;
+  }
+  sauverDossierEnCours();
+  renderListeDossiers();
+}
+
+function updateEnvoyeCheckbox(){
+  var chk = document.getElementById('dos-envoye');
+  if(!chk) return;
+  var d = allDossiers[currentDossierId];
+  chk.checked = d && d.envoye ? true : false;
+}
 </script>
 
 <!-- ══ DICTAPHONE ══ -->
@@ -2980,6 +3014,7 @@ html+='<button class="dc-del" onclick="event.stopPropagation();supprimerMandat(\
       html+='<div class="dc-info">'+nbLots+' lot(s)</div>';
       html+='<div class="dc-info" style="color:var(--text3)">'+dateCreation+'</div>';
       if(isActive)html+='<div style="margin-top:4px;font-size:10px;color:var(--tc2);font-weight:600">✓ EN COURS</div>';
+      if(m.envoye)html+='<div class="dc-envoye" title="Mandat envoyé"><i class="ti ti-check"></i></div>';
       html+='</div>';
     });
     html+='</div></div>';
@@ -3024,6 +3059,7 @@ function ouvrirMandat(id){
   document.getElementById('mand-num').value=m.num||'';
   document.getElementById('mand-date').value=m.date||'';
   document.getElementById('mand-representant').value=m.representant||'';
+  document.getElementById('mand-envoye').checked=m.envoye?true:false;
   mandatMandants=m.mandants&&m.mandants.length?JSON.parse(JSON.stringify(m.mandants)):[{nom:'',qualite:'',adresse:''}];
   mandatLots=m.lots&&m.lots.length?JSON.parse(JSON.stringify(m.lots)):[{id:1,desig:'',bas:'',haut:''}];
   mandatLotId=mandatLots.reduce(function(mx,l){return Math.max(mx,l.id||0);},0);
@@ -3116,6 +3152,16 @@ function updateTotauxMandat(){
   });
   document.getElementById('mand-total-bas').textContent=bas.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
   document.getElementById('mand-total-haut').textContent=haut.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+}
+
+// ── MANDAT ENVOYÉ ──────────────────────────────────────────
+function toggleMandatEnvoye(checked){
+  if(!currentMandatId)return;
+  var m=allMandats[currentMandatId];
+  if(!m)return;
+  m.envoye=checked;
+  sauverMandatFirebase(currentMandatId);
+  renderListeMandats();
 }
 
 // ── SAUVEGARDER ──────────────────────────────────────────
