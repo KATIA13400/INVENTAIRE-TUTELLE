@@ -3361,13 +3361,12 @@ function exportMandatPDF(){
   y+=15;
 
   // CONDITIONS GÉNÉRALES
-  if(y>240){doc.addPage();y=16;}
+  doc.addPage();y=16;
   fill(TC1);doc.rect(MG,y,CW,8,'F');
   sf(true,10,WHITE);doc.text('CONDITIONS GÉNÉRALES',MG+CW/2,y+5.5,{align:'center'});
   y+=14;
 
   function renderCgvLine(line){
-    if(line&&line.indexOf('2. RÉGIME FISCAL')===0){doc.addPage();y=16;}
     if(y>282){doc.addPage();y=16;}
     if(!line){y+=2;return;}
     var isTitre=/^[1-5]\.\s/.test(line);
