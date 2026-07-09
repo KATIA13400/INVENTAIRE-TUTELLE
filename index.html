@@ -614,9 +614,10 @@ function updateDriveStatus(){
           ✓ Mandat envoyé
         </label>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
         <div class="fg"><label>Numéro de mandat</label><input id="mand-num" placeholder="Ex: MV26001"/></div>
         <div class="fg"><label>Date</label><input id="mand-date" type="date"/></div>
+        <div class="fg"><label>Frais de vente HT (%)</label><input id="mand-frais-ht" type="number" step="0.1" value="15"/></div>
       </div>
     </div>
 
@@ -3060,6 +3061,7 @@ function ouvrirMandat(id){
   document.getElementById('mand-date').value=m.date||'';
   document.getElementById('mand-representant').value=m.representant||'';
   document.getElementById('mand-envoye').checked=m.envoye?true:false;
+  document.getElementById('mand-frais-ht').value=(m.fraisHT!=null?m.fraisHT:15);
   mandatMandants=m.mandants&&m.mandants.length?JSON.parse(JSON.stringify(m.mandants)):[{nom:'',qualite:'',adresse:''}];
   mandatLots=m.lots&&m.lots.length?JSON.parse(JSON.stringify(m.lots)):[{id:1,desig:'',bas:'',haut:''}];
   mandatLotId=mandatLots.reduce(function(mx,l){return Math.max(mx,l.id||0);},0);
@@ -3171,6 +3173,7 @@ function sauverMandat(){
   m.num=document.getElementById('mand-num').value.trim();
   m.date=document.getElementById('mand-date').value;
   m.representant=document.getElementById('mand-representant').value.trim();
+  m.fraisHT=parseFloat(document.getElementById('mand-frais-ht').value)||15;
   m.mandants=JSON.parse(JSON.stringify(mandatMandants));
   m.lots=JSON.parse(JSON.stringify(mandatLots));
   sauverMandatFirebase(currentMandatId);
@@ -3188,10 +3191,12 @@ function autoSaveMandat(){
   var elNum=document.getElementById('mand-num');
   var elDate=document.getElementById('mand-date');
   var elRep=document.getElementById('mand-representant');
+  var elFrais=document.getElementById('mand-frais-ht');
   if(!elNum||!elDate||!elRep)return;
   m.num=elNum.value.trim();
   m.date=elDate.value;
   m.representant=elRep.value.trim();
+  if(elFrais)m.fraisHT=parseFloat(elFrais.value)||15;
   m.mandants=JSON.parse(JSON.stringify(mandatMandants));
   m.lots=JSON.parse(JSON.stringify(mandatLots));
   sauverMandatFirebase(currentMandatId);
@@ -3334,6 +3339,26 @@ function exportMandatPDF(){
   sf(false,8.5,BLACK);doc.text('Fait à Aubagne',MG,y);y+=5;
   doc.text('Le '+dateStr,MG,y);y+=10;
   doc.text('Date et signature :',MG,y);y+=16;
+
+  // FRAIS DE VENTE
+  if(y>245){doc.addPage();y=16;}
+  var fraisHT=parseFloat(document.getElementById('mand-frais-ht').value)||15;
+  var fraisTTC=Math.round(fraisHT*1.2*100)/100;
+  fill(TC1);doc.rect(MG,y,CW,8,'F');
+  sf(true,10,WHITE);doc.text('FRAIS DE VENTE',MG+CW/2,y+5.5,{align:'center'});
+  y+=8;
+  fill(TC5);drw(TC4);lw(0.2);
+  doc.rect(MG,y,CW/2,8,'FD');doc.rect(MG+CW/2,y,CW/2,8,'FD');
+  sf(true,8.5,TC1);
+  doc.text('Montant HT',MG+CW/4,y+5.5,{align:'center'});
+  doc.text('Montant TTC',MG+CW*3/4,y+5.5,{align:'center'});
+  y+=8;
+  fill(WHITE);drw(TC4);lw(0.2);
+  doc.rect(MG,y,CW/2,9,'FD');doc.rect(MG+CW/2,y,CW/2,9,'FD');
+  sf(false,10,BLACK);
+  doc.text(String(fraisHT).replace('.',',')+' %',MG+CW/4,y+6.3,{align:'center'});
+  doc.text(String(fraisTTC).replace('.',',')+' %',MG+CW*3/4,y+6.3,{align:'center'});
+  y+=15;
 
   // CONDITIONS GÉNÉRALES
   if(y>240){doc.addPage();y=16;}
