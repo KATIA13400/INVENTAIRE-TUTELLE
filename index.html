@@ -3372,7 +3372,16 @@ function exportMandatPDF(){
     if(!line){y+=2;return;}
     var isTitre=/^[1-5]\.\s/.test(line);
     var isEntete=(line==="SAS PARCS ENCHÈRES Opérateur de Ventes Volontaires (OVV)");
+    var caseMatch=line.match(/^\[\s*\]\s*(.*)$/);
     sf(isEntete,7.5,BLACK);
+    if(caseMatch){
+      drw(BLACK);lw(0.3);
+      doc.rect(MG,y-2.5,3,3);
+      var wc=doc.splitTextToSize(caseMatch[1],CW-6);
+      doc.text(wc,MG+5,y);
+      y+=wc.length*4+1;
+      return;
+    }
     var w=doc.splitTextToSize(line,CW);
     doc.text(w,MG,y);
     if(isTitre){
