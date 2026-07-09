@@ -2270,14 +2270,15 @@ function svgCarrosserieBase(){
 }
 
 function svgDeuxRouesBase(){
-  return '<svg id="veh-schema-svg" viewBox="0 0 320 170" style="width:100%;height:auto;display:block;background:#fff;border:1px solid var(--border);border-radius:8px" xmlns="http://www.w3.org/2000/svg">'+
-    '<circle cx="55" cy="130" r="38" fill="none" stroke="#555" stroke-width="2"/>'+
-    '<circle cx="265" cy="130" r="38" fill="none" stroke="#555" stroke-width="2"/>'+
-    '<polyline points="55,130 100,65 160,50 205,68 265,130" fill="none" stroke="#555" stroke-width="2"/>'+
-    '<polyline points="55,130 130,105 205,68" fill="none" stroke="#555" stroke-width="2"/>'+
-    '<rect x="75" y="55" width="55" height="16" rx="6" ry="6" fill="none" stroke="#555" stroke-width="1.5"/>'+
-    '<line x1="200" y1="55" x2="235" y2="40" stroke="#555" stroke-width="2"/>'+
-    '<line x1="60" y1="150" x2="110" y2="155" stroke="#555" stroke-width="1.5"/>'+
+  // Vue de dessus (comme le schéma voiture), pour cohérence visuelle
+  return '<svg id="veh-schema-svg" viewBox="0 0 200 400" style="width:100%;height:auto;display:block;background:#fff;border:1px solid var(--border);border-radius:8px" xmlns="http://www.w3.org/2000/svg">'+
+    '<line x1="55" y1="50" x2="145" y2="50" stroke="#555" stroke-width="2"/>'+
+    '<rect x="85" y="40" width="30" height="55" fill="none" stroke="#555" stroke-width="2"/>'+
+    '<line x1="100" y1="95" x2="100" y2="140" stroke="#555" stroke-width="2"/>'+
+    '<ellipse cx="100" cy="175" rx="45" ry="40" fill="none" stroke="#555" stroke-width="2"/>'+
+    '<ellipse cx="100" cy="270" rx="35" ry="55" fill="none" stroke="#555" stroke-width="2"/>'+
+    '<line x1="100" y1="325" x2="100" y2="345" stroke="#555" stroke-width="2"/>'+
+    '<rect x="85" y="345" width="30" height="55" fill="none" stroke="#555" stroke-width="2"/>'+
     '</svg>';
 }
 
@@ -2400,8 +2401,7 @@ async function exportEstimationVehiculePDF(){
   }
   function dimensionsSchema(bw){
     var vw=200,vh=400;
-    if(veh.typeSchema==='deuxroues'){vw=320;vh=170;}
-    else if(veh.typeSchema==='bateau'){vw=170;vh=380;}
+    if(veh.typeSchema==='bateau'){vw=170;vh=380;}
     return bw*(vh/vw);
   }
   function dessinerCarrosserie(bx,by,bw){
@@ -2422,17 +2422,16 @@ async function exportEstimationVehiculePDF(){
     return bh;
   }
   function dessinerDeuxRoues(bx,by,bw){
-    var vw=320,vh=170,s=bw/vw,bh=vh*s;
-    function mp(px,py){return [bx+px*s,by+py*s];}
-    function seg(p1,p2){var a=mp(p1[0],p1[1]),b=mp(p2[0],p2[1]);doc.line(a[0],a[1],b[0],b[1]);}
+    // Vue de dessus (comme le schéma voiture), pour cohérence visuelle
+    var s=bw/200,bh=400*s;
     drw([85,85,85]);lw(0.4);
-    doc.circle(bx+55*s,by+130*s,38*s,'S');
-    doc.circle(bx+265*s,by+130*s,38*s,'S');
-    seg([55,130],[100,65]);seg([100,65],[160,50]);seg([160,50],[205,68]);seg([205,68],[265,130]);
-    seg([55,130],[130,105]);seg([130,105],[205,68]);
-    doc.roundedRect(bx+75*s,by+55*s,55*s,16*s,6*s,6*s,'S');
-    seg([200,55],[235,40]);
-    seg([60,150],[110,155]);
+    doc.line(bx+55*s,by+50*s,bx+145*s,by+50*s);
+    doc.rect(bx+85*s,by+40*s,30*s,55*s,'S');
+    doc.line(bx+100*s,by+95*s,bx+100*s,by+140*s);
+    doc.ellipse(bx+100*s,by+175*s,45*s,40*s,'S');
+    doc.ellipse(bx+100*s,by+270*s,35*s,55*s,'S');
+    doc.line(bx+100*s,by+325*s,bx+100*s,by+345*s);
+    doc.rect(bx+85*s,by+345*s,30*s,55*s,'S');
     dessinerCroixDommages(bx,by,bw,bh);
     return bh;
   }
@@ -2514,12 +2513,13 @@ async function exportEstimationVehiculePDF(){
     y+=7;
   }
 
-  ligneInfo('N° de dossier',h.dosNum,'Date de l\'estimation',fd2(new Date().toISOString().split('T')[0]));
-  ligneInfo('Protégé',protegeTexte,'Réalisée par',veh.realisePar||'Maître Katia FAGIANO');
+  ligneInfo('Commissaire de Justice',veh.realisePar||'Maître Katia FAGIANO','N. Inventaire',h.dosNum);
+  ligneInfo('Etude','SELARLU FAGIANO Katia','Date',fd2(new Date().toISOString().split('T')[0]));
+  ligneInfo('Protégé',protegeTexte,'Heure','');
+  ligneInfo('Domicile inventorié',h.dosAdresse,'Type de procedure',h.dosType);
+  ligneInfo('En présence de',h.dosPresence,'','');
   ligneInfo('Mandataire',h.mandNom,'Organisation',h.mandOrg);
   ligneInfo('Adresse mandataire',h.mandAdresse,'Tribunal',h.mandTribunal+(h.mandJugement?' - ord. du '+fd2(h.mandJugement):''));
-  ligneInfo('Fonction','Commissaire de Justice','Étude','SELARLU FAGIANO Katia');
-  ligneInfo('Adresse de l\'étude','Parcs Enchères, RN8 ZI St Mitre, 13400 Aubagne','','');
 
   sousTitre('VÉHICULE');
   ligneInfo('Marque',veh.marque,'Modèle',veh.modele);
