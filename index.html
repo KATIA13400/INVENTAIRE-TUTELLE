@@ -3485,9 +3485,14 @@ function exportMandatPDF(){
 
   cgvPart2.forEach(renderCgvLine);
 
-  // Pied de page
-  sf(false,7,TC2);
-  doc.text('N° TVA IC : FR52 918 901 836 - SIREN : 918 901 836 - www.parcsencheres.com',MG+CW/2,290,{align:'center'});
+  // Pied de page (mentions légales + numérotation sur toutes les pages)
+  var totalPages=doc.internal.getNumberOfPages();
+  for(var pageNum=1;pageNum<=totalPages;pageNum++){
+    doc.setPage(pageNum);
+    sf(false,7,TC2);
+    doc.text('N° TVA IC : FR52 918 901 836 - SIREN : 918 901 836 - www.parcsencheres.com',MG+CW/2,290,{align:'center'});
+    doc.text('Page '+pageNum+' / '+totalPages,MG+CW,290,{align:'right'});
+  }
 
   var nomFichier='Mandat_'+(m.nom||'vente').replace(/\s+/g,'_')+(m.num?'_'+m.num:'')+'.pdf';
   doc.save(nomFichier);
