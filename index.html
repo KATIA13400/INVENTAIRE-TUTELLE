@@ -3342,6 +3342,7 @@ function exportMandatPDF(){
   y+=14;
 
   function renderCgvLine(line){
+    if(line&&line.indexOf('2. RÉGIME FISCAL')===0){doc.addPage();y=16;}
     if(y>282){doc.addPage();y=16;}
     if(!line){y+=2;return;}
     var isTitre=/^[1-5]\.\s/.test(line);
