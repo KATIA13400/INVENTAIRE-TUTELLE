@@ -3339,7 +3339,23 @@ function exportMandatPDF(){
   if(y>240){doc.addPage();y=16;}
   fill(TC1);doc.rect(MG,y,CW,8,'F');
   sf(true,10,WHITE);doc.text('CONDITIONS GÉNÉRALES',MG+CW/2,y+5.5,{align:'center'});
-  y+=10;
+  y+=14;
+
+  function renderCgvLine(line){
+    if(y>282){doc.addPage();y=16;}
+    if(!line){y+=2;return;}
+    var isTitre=/^[1-5]\.\s/.test(line);
+    var isEntete=(line==="SAS PARCS ENCHÈRES Opérateur de Ventes Volontaires (OVV)");
+    sf(isEntete,7.5,BLACK);
+    var w=doc.splitTextToSize(line,CW);
+    doc.text(w,MG,y);
+    if(isTitre){
+      var tw=doc.getTextWidth(line);
+      drw(BLACK);lw(0.25);
+      doc.line(MG,y+1,MG+tw,y+1);
+    }
+    y+=w.length*4+1;
+  }
 
   var cgvPart1=[
     "SAS PARCS ENCHÈRES Opérateur de Ventes Volontaires (OVV)",
@@ -3361,14 +3377,7 @@ function exportMandatPDF(){
     "Conformément à la réglementation fiscale française, la SAS PARCS ENCHÈRES OVV agit en qualité de collecteur d'impôt. Les taxes dues seront retenues d'office sur le produit de la vente et reversées à l'administration fiscale."
   ];
 
-  sf(false,7.5,BLACK);
-  cgvPart1.forEach(function(line){
-    if(y>282){doc.addPage();y=16;}
-    if(!line){y+=2;return;}
-    var w=doc.splitTextToSize(line,CW);
-    doc.text(w,MG,y);
-    y+=w.length*4+1;
-  });
+  cgvPart1.forEach(renderCgvLine);
   y+=2;
 
   // TABLEAU RÉGIME FISCAL MÉTAUX PRÉCIEUX / OBJETS D'ART
@@ -3429,14 +3438,7 @@ function exportMandatPDF(){
     "Signature du Mandant (précédée de la mention manuscrite \"Bon pour accord et mandat de vente\") :"
   ];
 
-  sf(false,7.5,BLACK);
-  cgvPart2.forEach(function(line){
-    if(y>282){doc.addPage();y=16;}
-    if(!line){y+=2;return;}
-    var w=doc.splitTextToSize(line,CW);
-    doc.text(w,MG,y);
-    y+=w.length*4+1;
-  });
+  cgvPart2.forEach(renderCgvLine);
 
   // Pied de page
   sf(false,7,TC2);
