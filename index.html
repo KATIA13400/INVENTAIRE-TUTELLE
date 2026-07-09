@@ -2529,10 +2529,10 @@ async function exportEstimationVehiculePDF(){
   ligneInfo('État du véhicule',veh.descriptionEtat,'','');
   y+=6;
 
-  // Le schéma choisi (voiture, deux-roues ou bateau) n'a pas tous la même hauteur :
-  // on démarre une nouvelle page si la place restante ne suffit pas
+  // Fiche descriptive (schéma + équipements) — toujours sur une nouvelle page
+  doc.addPage();y=16;
+  sf(true,12,ROUGE);doc.text('Fiche descriptive',MG,y);y+=8;
   var hauteurSchemaPrevue=dimensionsSchema(75);
-  if(y+hauteurSchemaPrevue>282){doc.addPage();y=16;}
   var yZoneStart=y;
   dessinerSchema(MG,yZoneStart,75);
   var yEquip=dessinerEquipements(MG+90,yZoneStart+5);
