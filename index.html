@@ -806,6 +806,13 @@ function updateDriveStatus(){
 <div id="zone-vehicule" style="display:none">
   <div class="card">
     <div class="section-label"><i class="ti ti-car" style="font-size:14px"></i>Véhicule</div>
+    <div class="import-zone" id="veh-cg-drop-zone" onclick="document.getElementById('veh-cg-input').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleCarteGriseDrop(event)">
+      <i class="ti ti-id" style="font-size:26px;color:var(--text2)"></i><br>
+      <strong>Déposer la carte grise (PDF ou photo) ou cliquer pour choisir</strong>
+      <p>Analysée par l'IA — marque, modèle, immatriculation, etc. remplis automatiquement</p>
+    </div>
+    <input type="file" id="veh-cg-input" accept=".pdf,image/*" style="display:none" onchange="handleCarteGriseFile(this.files[0])"/>
+    <div id="veh-cg-sbar" class="sbar hidden"><span id="veh-cg-sbar-icon"></span>&nbsp;<span id="veh-cg-sbar-txt"></span></div>
     <div class="grid3">
       <div class="fg"><label>Marque</label><input id="veh-marque" placeholder="Ex : FORD"/></div>
       <div class="fg"><label>Modèle</label><input id="veh-modele" placeholder="Ex : MONDEO"/></div>
@@ -1973,6 +1980,50 @@ async function extractOrd(b64,apiKey){
 }
 function setOrdStatus(type,msg){const bar=document.getElementById('ord-sbar');bar.className='sbar '+type;document.getElementById('ord-sbar-txt').textContent=msg;document.getElementById('ord-sbar-icon').innerHTML=type==='loading'?'<i class="ti ti-loader-2" style="animation:spin 1s linear infinite;display:inline-block;font-size:14px"></i>':type==='ok'?'<i class="ti ti-circle-check" style="font-size:14px"></i>':'<i class="ti ti-alert-circle" style="font-size:14px"></i>';}
 
+// ── IMPORT AUTOMATIQUE PAR CARTE GRISE (véhicule) ─────────────────────────
+function handleCarteGriseDrop(e){
+  e.preventDefault();
+  document.getElementById('veh-cg-drop-zone').classList.remove('drag');
+  const f=e.dataTransfer.files[0];
+  if(f)handleCarteGriseFile(f);
+}
+function handleCarteGriseFile(file){
+  if(!file)return;
+  const apiKey=getApiKey();
+  if(!apiKey){setCarteGriseStatus('err','Entrez votre clé API.');return;}
+  setCarteGriseStatus('loading','Lecture…');
+  const r=new FileReader();
+  r.onload=async e=>{await extractCarteGrise(e.target.result.split(',')[1],file.type,apiKey);};
+  r.readAsDataURL(file);
+}
+async function extractCarteGrise(b64,mimeType,apiKey){
+  setCarteGriseStatus('loading','Analyse par l\'IA…');
+  try{
+    const isPdf=mimeType==='application/pdf';
+    const contentBlock=isPdf
+      ?{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}}
+      :{type:'image',source:{type:'base64',media_type:mimeType||'image/jpeg',data:b64}};
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:800,system:'Tu es un extracteur de données automobiles. Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans markdown, sans explication.',messages:[{role:'user',content:[contentBlock,{type:'text',text:'Extrais les informations de cette carte grise (certificat d\'immatriculation français). Réponds UNIQUEMENT avec ce JSON (rien d\'autre), laisse une valeur vide "" si l\'information n\'est pas trouvée : {"immat":"numéro d\'immatriculation (A)","dateCirculation":"date de première immatriculation (B) au format JJ/MM/AAAA","marque":"marque du véhicule (D.1)","modele":"dénomination commerciale (D.3)","energie":"Essence ou Diesel ou Électrique ou Hybride ou GPL déduit du type de carburant (P.3)","portes":"nombre de portes si mentionné","sieges":"nombre de places assises (S.1)","couleur":"couleur du véhicule si mentionnée"}'}]}]})});
+    const data=await resp.json();if(data.error)throw new Error(data.error.message);
+    const parsed=JSON.parse(data.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim());
+    const map={marque:'veh-marque',modele:'veh-modele',immat:'veh-immat',portes:'veh-portes',energie:'veh-energie',couleur:'veh-couleur',sieges:'veh-sieges'};
+    Object.keys(map).forEach(function(k){const el=document.getElementById(map[k]);if(el&&parsed[k])el.value=parsed[k];});
+    if(parsed.dateCirculation){
+      const p=parsed.dateCirculation.split('/');
+      if(p.length===3){const el=document.getElementById('veh-date-circulation');if(el)el.value=p[2]+'-'+p[1]+'-'+p[0];}
+    }
+    setCarteGriseStatus('ok','Informations extraites : '+((parsed.marque||'')+' '+(parsed.modele||'')).trim());
+    autosave();
+  }catch(err){setCarteGriseStatus('err','Erreur : '+err.message);}
+}
+function setCarteGriseStatus(type,msg){
+  const bar=document.getElementById('veh-cg-sbar');
+  if(!bar)return;
+  bar.className='sbar '+type;
+  document.getElementById('veh-cg-sbar-txt').textContent=msg;
+  document.getElementById('veh-cg-sbar-icon').innerHTML=type==='loading'?'<i class="ti ti-loader-2" style="animation:spin 1s linear infinite;display:inline-block;font-size:14px"></i>':type==='ok'?'<i class="ti ti-circle-check" style="font-size:14px"></i>':'<i class="ti ti-alert-circle" style="font-size:14px"></i>';
+}
+
 
 
 // ── GESTIONNAIRE DE DOSSIERS ─────────────────────────────────────────────────
@@ -2298,99 +2349,35 @@ async function exportEstimationVehiculePDF(){
 
   var vehiculeTexte=((veh.marque||'')+' '+(veh.modele||'')).trim()||'Véhicule';
   var protegeTexte=h.dosPersonne||'—';
+  var requeteTexte=(h.mandNom||'')+(h.mandOrg?', '+h.mandOrg:'')+(h.mandAdresse?', demeurant '+h.mandAdresse:'')+(h.mandTribunal?' — Par jugement du '+h.mandTribunal+(h.mandJugement?' en date du '+fd2(h.mandJugement):''):'');
 
-  // ═══════ PAGE 1 : PAGE DE GARDE ═══════
   var y=11;
   y=enTete(y);
   fill(TC1);doc.rect(MG,y,CW,9,'F');
-  sf(true,11,WHITE);doc.text("DOSSIER D'ESTIMATION VÉHICULE",W/2,y+6,{align:'center'});
-  y+=15;
-  sf(true,12,TC1);doc.text(vehiculeTexte,MG,y);y+=7;
-  sf(false,9,BLACK);
-  doc.text('Immatriculation : '+(veh.immat||'—'),MG,y);y+=6;
-  doc.text('N° de dossier : '+(h.dosNum||'—'),MG,y);y+=6;
-  doc.text('Estimation réalisée le : '+fd2(new Date().toISOString().split('T')[0]),MG,y);y+=10;
-
-  sf(true,9.5,TC1);doc.text('À la requête de :',MG,y);y+=6;
-  sf(false,9,BLACK);
-  var requeteTexte=(h.mandNom||'')+(h.mandOrg?', '+h.mandOrg:'')+(h.mandAdresse?', demeurant '+h.mandAdresse:'');
-  var wRequete=doc.splitTextToSize(requeteTexte,CW);
-  doc.text(wRequete,MG,y);y+=wRequete.length*4.5+4;
-
-  var wQualite=doc.splitTextToSize('Nommé(e) en qualité de '+(h.mandOrg||'mandataire')+' de '+protegeTexte,CW);
-  doc.text(wQualite,MG,y);y+=wQualite.length*4.5+2;
-  doc.text('Par jugement du '+(h.mandTribunal||'—')+' en date du '+fd2(h.mandJugement),MG,y);y+=14;
-
-  sf(false,9,BLACK);
-  doc.text('Estimation réalisée par :',MG,y);
-  doc.text('Maître Katia FAGIANO',MG+CW/2,y);y+=5;
-  doc.text('Commissaire-Priseur Judiciaire',MG,y);
-  doc.text('Commissaire de Justice',MG+CW/2,y);y+=10;
-  doc.text("Annexes : Photos, fiche d'identification",MG,y);
-
-  // ═══════ PAGE 2 : LETTRE AU MANDATAIRE ═══════
-  doc.addPage();y=11;
-  y=enTete(y);
-  y+=4;
-  sf(false,9.5,BLACK);
-  doc.text('Madame, Monsieur,',MG,y);y+=8;
-  var intro="Dans le cadre du dossier sus-référencé, je fais suite à l'estimation demandée concernant :";
-  var wIntro=doc.splitTextToSize(intro,CW);
-  doc.text(wIntro,MG,y);y+=wIntro.length*4.5+4;
-  doc.text('Le véhicule : '+vehiculeTexte,MG,y);y+=5.5;
-  doc.text('Immatriculé : '+(veh.immat||'—'),MG,y);y+=9;
-
-  if(veh.descriptionEtat){
-    var wDesc=doc.splitTextToSize(veh.descriptionEtat,CW);
-    doc.text(wDesc,MG,y);y+=wDesc.length*4.5+6;
-  }
-  doc.text('De ce fait, à la vue de ces éléments,',MG,y);y+=8;
-  sf(true,10,TC1);
-  doc.text("J'estime ce véhicule à "+(veh.estimation||'0')+' € (mise à prix)',MG,y);y+=5.5;
-  sf(false,8,BLACK);
-  var wReserve=doc.splitTextToSize("(Sous réserve qu'il n'y ait pas de problèmes mécaniques majeurs au contrôle technique et expertise à venir)",CW);
-  doc.text(wReserve,MG,y);y+=wReserve.length*4+6;
-
-  if(veh.proposerAbandon){
-    sf(false,9,BLACK);
-    var txtAbandon="Compte tenu de la faible valeur vénale du véhicule, il y aurait lieu de faire abandon de celui-ci. En effet, les frais légaux de vente, de transport, de publicité et le coût du contrôle technique seraient supérieurs au produit de la vente, rendant celle-ci déficitaire.";
-    var wAbandon=doc.splitTextToSize(txtAbandon,CW);
-    doc.text(wAbandon,MG,y);y+=wAbandon.length*4.5+6;
-  }
-
-  doc.text('Je reste à votre entière disposition pour plus de renseignements,',MG,y);y+=7;
-  doc.text('La durée de validité de cette estimation est de 3 mois.',MG,y);y+=7;
-  var wPolitesse=doc.splitTextToSize('Et vous prie d\'agréer, Madame, Monsieur, mes salutations les meilleures.',CW);
-  doc.text(wPolitesse,MG,y);y+=wPolitesse.length*4.5+10;
-  sf(true,9,BLACK);doc.text('Maître FAGIANO Katia',MG+CW-2,y,{align:'right'});y+=16;
-
-  if(y>250){doc.addPage();y=16;}
-  sf(false,7,TC2);
-  var wRgpd=doc.splitTextToSize('"Dans le cadre de nos activités, nous sommes amenés à collecter des données à caractère personnel. Vous disposez d\'un droit d\'accès, de rectification et d\'opposition sur vos données personnelles en vous adressant par tout moyen directement à notre étude. Nous pourrons utiliser ces données afin de satisfaire à nos obligations légales et aux fins d\'exercice de notre activité. Ces données pourront également être communiquées aux autorités compétentes dès lors que la réglementation l\'impose."',CW);
-  doc.text(wRgpd,MG,y);
-
-  // ═══════ PAGE 3 : FICHE ESTIMATION VÉHICULE ═══════
-  doc.addPage();y=16;
-  fill(TC1);doc.rect(MG,y,CW,9,'F');
-  sf(true,11,WHITE);doc.text('FICHE ESTIMATION VÉHICULE',W/2,y+6,{align:'center'});
+  sf(true,11,WHITE);doc.text('ESTIMATION VÉHICULE',W/2,y+6,{align:'center'});
   y+=13;
+  sf(true,12,TC1);doc.text(vehiculeTexte+(veh.immat?' — '+veh.immat:''),MG,y);y+=8;
 
   var infoR=[
     ['Protégé',protegeTexte,'Immatriculation',veh.immat||''],
     ['Localisation véhicule',h.dosAdresse||'','',''],
+    ['À la requête de',requeteTexte,'',''],
     ['Marque',veh.marque||'','Modèle',veh.modele||''],
     ['1ère mise en circulation',fd2(veh.dateCirculation),'Nb portes',veh.portes||''],
     ['Énergie',veh.energie||'','Couleur',veh.couleur||''],
-    ['Kilométrage',veh.kms?veh.kms+' km':'','Nb sièges',veh.sieges||'']
+    ['Kilométrage',veh.kms?veh.kms+' km':'','Nb sièges',veh.sieges||''],
+    ['N° de dossier',h.dosNum||'','Date de l\'estimation',fd2(new Date().toISOString().split('T')[0])]
   ];
   infoR.forEach(function(row,i){
     var bg=i%2===0?GREY:TC6;
     if(row[2]===''){
-      fill(bg);doc.rect(MG,y,CW,8,'F');
-      drw(TC4);lw(0.2);doc.rect(MG,y,CW,8,'S');
+      var w1=doc.splitTextToSize(row[1]||'—',CW-44);
+      var rh=Math.max(8,w1.length*4+4);
+      fill(bg);doc.rect(MG,y,CW,rh,'F');
+      drw(TC4);lw(0.2);doc.rect(MG,y,CW,rh,'S');
       sf(true,7.5,TC2);doc.text(row[0],MG+1.5,y+5);
-      sf(false,7.5,BLACK);doc.text(row[1]||'—',MG+42,y+5);
-      y+=8;return;
+      sf(false,7.5,BLACK);doc.text(w1,MG+42,y+5);
+      y+=rh;return;
     }
     fill(bg);doc.rect(MG,y,CW/2,8,'F');doc.rect(MG+CW/2,y,CW/2,8,'F');
     drw(TC4);lw(0.2);doc.rect(MG,y,CW/2,8,'S');doc.rect(MG+CW/2,y,CW/2,8,'S');
@@ -2402,10 +2389,21 @@ async function exportEstimationVehiculePDF(){
   });
   y+=6;
 
+  if(veh.descriptionEtat){
+    if(y>260){doc.addPage();y=16;}
+    sf(true,9,TC1);doc.text('État du véhicule :',MG,y);y+=5;
+    sf(false,8.5,BLACK);
+    var wDesc=doc.splitTextToSize(veh.descriptionEtat,CW);
+    doc.text(wDesc,MG,y);y+=wDesc.length*4.2+6;
+  }
+
+  // Le schéma de carrosserie a besoin d'environ 150mm de haut : on démarre une
+  // nouvelle page si la place restante ne suffit pas
+  if(y>130){doc.addPage();y=16;}
   var yZoneStart=y;
   dessinerCarrosserie(MG,yZoneStart,75);
   var yEquip=dessinerEquipements(MG+90,yZoneStart+5);
-  y=Math.max(yZoneStart+75*2+8,yEquip)+4;
+  y=Math.max(yZoneStart+150+8,yEquip)+4;
 
   if(y>240){doc.addPage();y=16;}
   sf(true,9,TC1);doc.text('État général :',MG,y+5.5);
@@ -2436,6 +2434,33 @@ async function exportEstimationVehiculePDF(){
     var wRem=doc.splitTextToSize(veh.remarques,CW);
     doc.text(wRem,MG,y);y+=wRem.length*4+4;
   }
+
+  if(veh.proposerAbandon){
+    if(y>250){doc.addPage();y=16;}
+    y+=2;
+    sf(true,8.5,TC1);doc.text("Proposition d'abandon :",MG,y);y+=5;
+    sf(false,8.5,BLACK);
+    var txtAbandon="Compte tenu de la faible valeur vénale du véhicule, il y aurait lieu de faire abandon de celui-ci. En effet, les frais légaux de vente, de transport, de publicité et le coût du contrôle technique seraient supérieurs au produit de la vente, rendant celle-ci déficitaire.";
+    var wAbandon=doc.splitTextToSize(txtAbandon,CW);
+    doc.text(wAbandon,MG,y);y+=wAbandon.length*4.2+6;
+  }
+
+  if(y>245){doc.addPage();y=16;}
+  y+=2;
+  sf(false,7,TC2);
+  var wRgpd=doc.splitTextToSize('"Dans le cadre de nos activités, nous sommes amenés à collecter des données à caractère personnel. Vous disposez d\'un droit d\'accès, de rectification et d\'opposition sur vos données personnelles en vous adressant par tout moyen directement à notre étude. Nous pourrons utiliser ces données afin de satisfaire à nos obligations légales et aux fins d\'exercice de notre activité. Ces données pourront également être communiquées aux autorités compétentes dès lors que la réglementation l\'impose."',CW);
+  doc.text(wRgpd,MG,y);y+=wRgpd.length*3.6+10;
+
+  // ── ESTIMATION EN GROS, TOUJOURS EN DERNIER ──
+  if(y>255){doc.addPage();y=20;}
+  fill(TC1);doc.rect(MG,y,CW,20,'F');
+  sf(true,10,WHITE);doc.text('ESTIMATION (MISE À PRIX)',MG+CW/2,y+7,{align:'center'});
+  sf(true,18,WHITE);doc.text((veh.estimation||'0')+' €',MG+CW/2,y+16,{align:'center'});
+  y+=25;
+  sf(false,7.5,BLACK);
+  var wReserve=doc.splitTextToSize("Sous réserve qu'il n'y ait pas de problèmes mécaniques majeurs au contrôle technique et expertise à venir. Durée de validité de cette estimation : 3 mois.",CW);
+  doc.text(wReserve,MG,y);y+=wReserve.length*4+5;
+  sf(true,8.5,BLACK);doc.text('Estimation réalisée par Maître Katia FAGIANO, Commissaire de Justice',MG+CW,y,{align:'right'});
 
   // Pied de page (mentions légales + numérotation sur toutes les pages)
   var totalPages=doc.internal.getNumberOfPages();
