@@ -1532,6 +1532,11 @@ function parseVal(s){
   if(!s)return 0;
   return parseFloat(s.toString().replace(/\s/g,'').replace(',','.'))||0;
 }
+function fraisHTouDefaut(v){
+  // 0 % est une valeur valide (frais offerts) : ne pas la confondre avec une valeur vide/invalide
+  var n=parseFloat(v);
+  return isNaN(n)?15:n;
+}
 function updateTotals(){
   let bas=0,haut=0;
   document.querySelectorAll('input[data-f="bas"]').forEach(el=>{
@@ -3173,7 +3178,7 @@ function sauverMandat(){
   m.num=document.getElementById('mand-num').value.trim();
   m.date=document.getElementById('mand-date').value;
   m.representant=document.getElementById('mand-representant').value.trim();
-  m.fraisHT=parseFloat(document.getElementById('mand-frais-ht').value)||15;
+  m.fraisHT=fraisHTouDefaut(document.getElementById('mand-frais-ht').value);
   m.mandants=JSON.parse(JSON.stringify(mandatMandants));
   m.lots=JSON.parse(JSON.stringify(mandatLots));
   sauverMandatFirebase(currentMandatId);
@@ -3196,7 +3201,7 @@ function autoSaveMandat(){
   m.num=elNum.value.trim();
   m.date=elDate.value;
   m.representant=elRep.value.trim();
-  if(elFrais)m.fraisHT=parseFloat(elFrais.value)||15;
+  if(elFrais)m.fraisHT=fraisHTouDefaut(elFrais.value);
   m.mandants=JSON.parse(JSON.stringify(mandatMandants));
   m.lots=JSON.parse(JSON.stringify(mandatLots));
   sauverMandatFirebase(currentMandatId);
@@ -3342,7 +3347,7 @@ function exportMandatPDF(){
 
   // FRAIS DE VENTE
   if(y>245){doc.addPage();y=16;}
-  var fraisHT=parseFloat(document.getElementById('mand-frais-ht').value)||15;
+  var fraisHT=fraisHTouDefaut(document.getElementById('mand-frais-ht').value);
   var fraisTTC=Math.round(fraisHT*1.2*100)/100;
   fill(TC1);doc.rect(MG,y,CW,8,'F');
   sf(true,10,WHITE);doc.text('FRAIS DE VENTE',MG+CW/2,y+5.5,{align:'center'});
