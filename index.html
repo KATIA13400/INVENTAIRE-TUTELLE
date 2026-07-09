@@ -842,7 +842,13 @@ function updateDriveStatus(){
   </div>
 
   <div class="card">
-    <div class="section-label"><i class="ti ti-car-crash" style="font-size:14px"></i>Schéma de la carrosserie <span style="font-size:10px;font-weight:400;color:var(--tc3);margin-left:8px"><i class="ti ti-info-circle"></i> Cliquez pour poser une croix, recliquez dessus pour la retirer</span></div>
+    <div class="section-label" style="justify-content:space-between">
+      <span><i class="ti ti-car-crash" style="font-size:14px"></i>Schéma de la carrosserie <span style="font-size:10px;font-weight:400;color:var(--tc3);margin-left:8px"><i class="ti ti-info-circle"></i> Cliquez pour poser une croix, recliquez dessus pour la retirer</span></span>
+      <select id="veh-type-schema" onchange="changerTypeSchema(this.value)" style="width:auto;font-size:12px">
+        <option value="voiture">Voiture</option>
+        <option value="deuxroues">Deux-roues (moto / scooter)</option>
+      </select>
+    </div>
     <div id="veh-schema-conteneur" style="max-width:320px;margin:0 auto;position:relative;cursor:crosshair"></div>
   </div>
 
@@ -1377,7 +1383,15 @@ async function exportPDF(){
     lb.forEach((line,i)=>doc.text(line,MG+7,y+10+(i*lineHB)));
     y+=lbH+5;
   }
+  // ── MENTION RGPD ─────────────────────────────────────────────────────────
+  if(y>245){doc.addPage();y=20;}
+  y+=2;
+  sf(false,7,TC2);
+  const wRgpd=doc.splitTextToSize('"Dans le cadre de nos activités, nous sommes amenés à collecter des données à caractère personnel. Vous disposez d\'un droit d\'accès, de rectification et d\'opposition sur vos données personnelles en vous adressant par tout moyen directement à notre étude. Nous pourrons utiliser ces données afin de satisfaire à nos obligations légales et aux fins d\'exercice de notre activité. Ces données pourront également être communiquées aux autorités compétentes dès lors que la réglementation l\'impose."',CW);
+  doc.text(wRgpd,MG,y);y+=wRgpd.length*3.6+8;
+
   // ── SIGNATURE ────────────────────────────────────────────────────────────
+  if(y>235){doc.addPage();y=20;}
   sf(false,9,BLACK);doc.text('Fait à Aubagne',MG,y);y+=6;
   doc.text('Le '+fd2(h.dosDate||''),MG,y);y+=14;
   doc.text('Et signé après lecture,',MG,y);y+=8;
@@ -2124,7 +2138,8 @@ function ouvrirModalNouveauDossier(estimVehicule){
 function vehiculeParDefaut(){
   return {marque:'',modele:'',immat:'',dateCirculation:'',portes:'',energie:'',couleur:'',
     kms:'',sieges:'',realisePar:'',equipements:{},etat:'',ficheIdentif:false,carteGrise:false,
-    remarques:'',descriptionEtat:'',proposerAbandon:false,mentionVente:false,estimation:'',dommages:[]};
+    remarques:'',descriptionEtat:'',proposerAbandon:false,mentionVente:false,estimation:'',
+    dommages:[],typeSchema:'voiture'};
 }
 
 var EQUIPEMENTS_VEHICULE=[
@@ -2178,7 +2193,8 @@ function getVehicule(){
     proposerAbandon:document.getElementById('veh-proposer-abandon')?document.getElementById('veh-proposer-abandon').checked:false,
     mentionVente:document.getElementById('veh-mention-vente')?document.getElementById('veh-mention-vente').checked:false,
     estimation:v('veh-estimation'),
-    dommages:(d.vehicule&&d.vehicule.dommages)||[]
+    dommages:(d.vehicule&&d.vehicule.dommages)||[],
+    typeSchema:(d.vehicule&&d.vehicule.typeSchema)||'voiture'
   };
 }
 
@@ -2231,10 +2247,32 @@ function svgCarrosserieBase(){
     '</svg>';
 }
 
+function svgDeuxRouesBase(){
+  return '<svg id="veh-schema-svg" viewBox="0 0 200 400" style="width:100%;height:auto;display:block;background:#fff;border:1px solid var(--border);border-radius:8px" xmlns="http://www.w3.org/2000/svg">'+
+    '<circle cx="100" cy="70" r="28" fill="none" stroke="#555" stroke-width="2"/>'+
+    '<circle cx="100" cy="330" r="28" fill="none" stroke="#555" stroke-width="2"/>'+
+    '<line x1="100" y1="98" x2="100" y2="302" stroke="#555" stroke-width="2"/>'+
+    '<line x1="55" y1="90" x2="145" y2="90" stroke="#555" stroke-width="2"/>'+
+    '<rect x="65" y="170" width="70" height="60" rx="10" fill="none" stroke="#555" stroke-width="1.5"/>'+
+    '</svg>';
+}
+
+function changerTypeSchema(type){
+  var d=allDossiers[currentDossierId];
+  if(!d)return;
+  if(!d.vehicule)d.vehicule=vehiculeParDefaut();
+  d.vehicule.typeSchema=type;
+  renderSchemaDommages();
+  autosave();
+}
+
 function renderSchemaDommages(){
   var conteneur=document.getElementById('veh-schema-conteneur');
   if(!conteneur)return;
-  conteneur.innerHTML=svgCarrosserieBase();
+  var d0=allDossiers[currentDossierId];
+  var typeSchema=(d0&&d0.vehicule&&d0.vehicule.typeSchema)||'voiture';
+  var elType=document.getElementById('veh-type-schema');if(elType)elType.value=typeSchema;
+  conteneur.innerHTML=typeSchema==='deuxroues'?svgDeuxRouesBase():svgCarrosserieBase();
   var svg=document.getElementById('veh-schema-svg');
   var d=allDossiers[currentDossierId];
   var dommages=(d&&d.vehicule&&d.vehicule.dommages)||[];
@@ -2315,6 +2353,15 @@ async function exportEstimationVehiculePDF(){
     sf(false,7,TC3);doc.text('hoteldesventes.aubagne@gmail.com  |  www.parcsencheres.com',MG+38,y+33);
     return y+43;
   }
+  function dessinerCroixDommages(bx,by,s){
+    drw(ROUGE);lw(0.7);
+    (veh.dommages||[]).forEach(function(pt){
+      var px=pt.xPct*2,py=pt.yPct*4;
+      var c=[bx+px*s,by+py*s],r=3;
+      doc.line(c[0]-r,c[1]-r,c[0]+r,c[1]+r);
+      doc.line(c[0]-r,c[1]+r,c[0]+r,c[1]-r);
+    });
+  }
   function dessinerCarrosserie(bx,by,bw){
     var s=bw/200,bh=400*s;
     function mp(px,py){return [bx+px*s,by+py*s];}
@@ -2329,14 +2376,22 @@ async function exportEstimationVehiculePDF(){
     seg([60,130],[140,130]);seg([140,130],[125,90]);seg([125,90],[75,90]);seg([75,90],[60,130]);
     seg([60,270],[140,270]);seg([140,270],[125,310]);seg([125,310],[75,310]);seg([75,310],[60,270]);
     seg([100,130],[100,270]);
-    drw(ROUGE);lw(0.7);
-    (veh.dommages||[]).forEach(function(pt){
-      var px=pt.xPct*2,py=pt.yPct*4;
-      var c=mp(px,py),r=3;
-      doc.line(c[0]-r,c[1]-r,c[0]+r,c[1]+r);
-      doc.line(c[0]-r,c[1]+r,c[0]+r,c[1]-r);
-    });
+    dessinerCroixDommages(bx,by,s);
     return bh;
+  }
+  function dessinerDeuxRoues(bx,by,bw){
+    var s=bw/200,bh=400*s;
+    drw([85,85,85]);lw(0.4);
+    doc.circle(bx+100*s,by+70*s,28*s,'S');
+    doc.circle(bx+100*s,by+330*s,28*s,'S');
+    doc.line(bx+100*s,by+98*s,bx+100*s,by+302*s);
+    doc.line(bx+55*s,by+90*s,bx+145*s,by+90*s);
+    doc.roundedRect(bx+65*s,by+170*s,70*s,60*s,10*s,10*s,'S');
+    dessinerCroixDommages(bx,by,s);
+    return bh;
+  }
+  function dessinerSchema(bx,by,bw){
+    return veh.typeSchema==='deuxroues'?dessinerDeuxRoues(bx,by,bw):dessinerCarrosserie(bx,by,bw);
   }
   function dessinerEquipements(ex,ey){
     var yy=ey;
@@ -2354,60 +2409,65 @@ async function exportEstimationVehiculePDF(){
 
   var vehiculeTexte=((veh.marque||'')+' '+(veh.modele||'')).trim()||'Véhicule';
   var protegeTexte=h.dosPersonne||'—';
-  var requeteTexte=(h.mandNom||'')+(h.mandOrg?', '+h.mandOrg:'')+(h.mandAdresse?', demeurant '+h.mandAdresse:'')+(h.mandTribunal?' — Par jugement du '+h.mandTribunal+(h.mandJugement?' en date du '+fd2(h.mandJugement):''):'');
+  function fmtEstimation(n){
+    return (parseFloat(n)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/[  ]/g,' ');
+  }
 
   var y=11;
   y=enTete(y);
   fill(TC1);doc.rect(MG,y,CW,9,'F');
   sf(true,11,WHITE);doc.text('ESTIMATION VÉHICULE',W/2,y+6,{align:'center'});
-  y+=13;
+  y+=17;
   sf(true,12,TC1);doc.text(vehiculeTexte+(veh.immat?' — '+veh.immat:''),MG,y);y+=8;
 
-  var infoR=[
-    ['Protégé',protegeTexte,'Immatriculation',veh.immat||''],
-    ['Localisation véhicule',h.dosAdresse||'','',''],
-    ['À la requête de',requeteTexte,'',''],
-    ['Marque',veh.marque||'','Modèle',veh.modele||''],
-    ['1ère mise en circulation',fd2(veh.dateCirculation),'Nb portes',veh.portes||''],
-    ['Énergie',veh.energie||'','Couleur',veh.couleur||''],
-    ['Kilométrage',veh.kms?veh.kms+' km':'','Nb sièges',veh.sieges||''],
-    ['N° de dossier',h.dosNum||'','Date de l\'estimation',fd2(new Date().toISOString().split('T')[0])],
-    ['Réalisée par',veh.realisePar||'Maître Katia FAGIANO','Fonction','Commissaire de Justice']
-  ];
-  infoR.forEach(function(row,i){
-    var bg=i%2===0?GREY:TC6;
-    if(row[2]===''){
-      var w1=doc.splitTextToSize(row[1]||'—',CW-44);
+  var infoIdx=0;
+  function ligneInfo(label1,val1,label2,val2){
+    var bg=infoIdx%2===0?GREY:TC6;infoIdx++;
+    if(label2===''){
+      sf(false,7.5,BLACK);
+      var w1=doc.splitTextToSize(String(val1||'—'),CW-44);
       var rh=Math.max(8,w1.length*4+4);
+      if(y+rh>282){doc.addPage();y=16;}
       fill(bg);doc.rect(MG,y,CW,rh,'F');
       drw(TC4);lw(0.2);doc.rect(MG,y,CW,rh,'S');
-      sf(true,7.5,TC2);doc.text(row[0],MG+1.5,y+5);
+      sf(true,7.5,TC2);doc.text(label1,MG+1.5,y+5);
       sf(false,7.5,BLACK);doc.text(w1,MG+42,y+5);
-      y+=rh;return;
+      y+=rh;
+      return;
     }
-    fill(bg);doc.rect(MG,y,CW/2,8,'F');doc.rect(MG+CW/2,y,CW/2,8,'F');
-    drw(TC4);lw(0.2);doc.rect(MG,y,CW/2,8,'S');doc.rect(MG+CW/2,y,CW/2,8,'S');
-    sf(true,7.5,TC2);doc.text(row[0],MG+1.5,y+5);
-    sf(false,7.5,BLACK);doc.text(String(row[1]||'—'),MG+42,y+5);
-    sf(true,7.5,TC2);doc.text(row[2],MG+CW/2+1.5,y+5);
-    sf(false,7.5,BLACK);doc.text(String(row[3]||'—'),MG+CW/2+30,y+5);
-    y+=8;
-  });
-  y+=6;
-
-  if(veh.descriptionEtat){
-    if(y>260){doc.addPage();y=16;}
-    sf(true,9,TC1);doc.text('État du véhicule :',MG,y);y+=5;
-    sf(false,8.5,BLACK);
-    var wDesc=doc.splitTextToSize(veh.descriptionEtat,CW);
-    doc.text(wDesc,MG,y);y+=wDesc.length*4.2+6;
+    sf(false,7.5,BLACK);
+    var w1=doc.splitTextToSize(String(val1||'—'),CW/2-44);
+    var w2=doc.splitTextToSize(String(val2||'—'),CW/2-32);
+    var rh=Math.max(8,Math.max(w1.length,w2.length)*4+4);
+    if(y+rh>282){doc.addPage();y=16;}
+    fill(bg);doc.rect(MG,y,CW/2,rh,'F');doc.rect(MG+CW/2,y,CW/2,rh,'F');
+    drw(TC4);lw(0.2);doc.rect(MG,y,CW/2,rh,'S');doc.rect(MG+CW/2,y,CW/2,rh,'S');
+    sf(true,7.5,TC2);doc.text(label1,MG+1.5,y+5);
+    sf(false,7.5,BLACK);doc.text(w1,MG+42,y+5);
+    sf(true,7.5,TC2);doc.text(label2,MG+CW/2+1.5,y+5);
+    sf(false,7.5,BLACK);doc.text(w2,MG+CW/2+30,y+5);
+    y+=rh;
   }
 
-  // Le schéma de carrosserie a besoin d'environ 150mm de haut : on démarre une
-  // nouvelle page si la place restante ne suffit pas
+  ligneInfo('Protégé',protegeTexte,'Immatriculation',veh.immat);
+  ligneInfo('Localisation véhicule',h.dosAdresse,'','');
+  ligneInfo('Mandataire',h.mandNom,'Organisation',h.mandOrg);
+  ligneInfo('Adresse mandataire',h.mandAdresse,'Tribunal',h.mandTribunal+(h.mandJugement?' - ord. du '+fd2(h.mandJugement):''));
+  ligneInfo('État du véhicule',veh.descriptionEtat,'','');
+  ligneInfo('Marque',veh.marque,'Modèle',veh.modele);
+  ligneInfo('1ère mise en circulation',fd2(veh.dateCirculation),'Nb portes',veh.portes);
+  ligneInfo('Énergie',veh.energie,'Couleur',veh.couleur);
+  ligneInfo('Kilométrage',veh.kms?veh.kms+' km':'','Nb sièges',veh.sieges);
+  ligneInfo('N° de dossier',h.dosNum,'Date de l\'estimation',fd2(new Date().toISOString().split('T')[0]));
+  ligneInfo('Réalisée par',veh.realisePar||'Maître Katia FAGIANO','Fonction','Commissaire de Justice');
+  ligneInfo('Étude','SELARLU FAGIANO Katia','Adresse de l\'étude','Parcs Enchères, RN8 ZI St Mitre, 13400 Aubagne');
+  y+=6;
+
+  // Le schéma choisi (voiture ou deux-roues) a besoin d'environ 150mm de haut :
+  // on démarre une nouvelle page si la place restante ne suffit pas
   if(y>130){doc.addPage();y=16;}
   var yZoneStart=y;
-  dessinerCarrosserie(MG,yZoneStart,75);
+  dessinerSchema(MG,yZoneStart,75);
   var yEquip=dessinerEquipements(MG+90,yZoneStart+5);
   y=Math.max(yZoneStart+150+8,yEquip)+4;
 
@@ -2457,34 +2517,35 @@ async function exportEstimationVehiculePDF(){
   var wRgpd=doc.splitTextToSize('"Dans le cadre de nos activités, nous sommes amenés à collecter des données à caractère personnel. Vous disposez d\'un droit d\'accès, de rectification et d\'opposition sur vos données personnelles en vous adressant par tout moyen directement à notre étude. Nous pourrons utiliser ces données afin de satisfaire à nos obligations légales et aux fins d\'exercice de notre activité. Ces données pourront également être communiquées aux autorités compétentes dès lors que la réglementation l\'impose."',CW);
   doc.text(wRgpd,MG,y);y+=wRgpd.length*3.6+10;
 
-  if(veh.mentionVente){
-    if(y>240){doc.addPage();y=16;}
-    y+=2;
-    var txtVente="Si vous désirez vendre ce véhicule par notre biais aux enchères publiques, il faudrait déduire du prix d'adjudication : le coût du contrôle technique, le transport, les frais de publicité, les frais légaux de vente.";
-    var wVente=doc.splitTextToSize(txtVente,CW-14);
-    var venteH=wVente.length*5+16;
-    fill(TC5);drw(TC4);lw(0.3);doc.rect(MG,y,CW,venteH,'FD');
-    sf(true,8.5,TC1);
-    wVente.forEach(function(line,i){doc.text(line,MG+7,y+10+i*5);});
-    y+=venteH+6;
-  }
-
   // ── ÉTAT RÉCAPITULATIF (comme les inventaires) ──
-  if(y>235){doc.addPage();y=20;}
+  if(y>230){doc.addPage();y=20;}
   else y+=2;
   fill(TC1);doc.rect(MG,y,CW,9,'F');
   sf(true,11,WHITE);doc.text('ÉTAT RÉCAPITULATIF',W/2,y+6,{align:'center'});
   y+=13;
-  fill(TC5);drw(TC4);lw(0.3);
-  doc.rect(MG,y,CW-38,12,'FD');doc.rect(MG+CW-37,y,37,12,'FD');
+  var rightW=55,leftW=CW-rightW;
   sf(true,8.5,BLACK);
-  var wEstLettres=doc.splitTextToSize('ESTIMATION (MISE À PRIX) : '+montantEnLettres(veh.estimation),CW-42);
-  doc.text(wEstLettres,MG+2,y+5);
-  sf(true,15,TC1);doc.text((parseFloat(veh.estimation)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €',MG+CW-3,y+8,{align:'right'});
-  y+=16;
+  var wEstLettres=doc.splitTextToSize('ESTIMATION (MISE À PRIX) : '+montantEnLettres(veh.estimation),leftW-6);
+  var recapH=Math.max(14,wEstLettres.length*4.5+6);
+  fill(TC5);drw(TC4);lw(0.3);
+  doc.rect(MG,y,leftW,recapH,'FD');doc.rect(MG+leftW,y,rightW,recapH,'FD');
+  doc.text(wEstLettres,MG+2,y+5.5);
+  sf(true,13,TC1);doc.text(fmtEstimation(veh.estimation)+' €',MG+CW-3,y+recapH/2+2,{align:'right'});
+  y+=recapH+4;
   sf(false,7.5,BLACK);
   var wReserve=doc.splitTextToSize("Sous réserve qu'il n'y ait pas de problèmes mécaniques majeurs au contrôle technique et expertise à venir. Durée de validité de cette estimation : 3 mois.",CW);
   doc.text(wReserve,MG,y);y+=wReserve.length*4+8;
+
+  if(veh.mentionVente){
+    if(y>230){doc.addPage();y=16;}
+    var txtVente="Si vous désirez vendre ce véhicule par notre biais aux enchères publiques, il faudrait déduire du prix d'adjudication : le coût du contrôle technique, le transport, les frais de publicité, les frais légaux de vente.";
+    sf(true,8.5,TC1);
+    var wVente=doc.splitTextToSize(txtVente,CW-14);
+    var venteH=wVente.length*5+16;
+    fill(TC5);drw(TC4);lw(0.3);doc.rect(MG,y,CW,venteH,'FD');
+    doc.text(wVente,MG+7,y+10);
+    y+=venteH+8;
+  }
 
   // ── SIGNATURE ──
   if(y>210){doc.addPage();y=20;}
