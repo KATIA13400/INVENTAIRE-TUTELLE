@@ -259,6 +259,8 @@ function fbSauver(dossierId, dossier) {
     dateMaj: Date.now(),
     termine: dossier.termine || false,
     envoye: dossier.envoye || false,
+    estimVehicule: dossier.estimVehicule || false,
+    vehicule: dossier.vehicule || null,
     h: dossier.h || {},
     rows: (dossier.rows || []).map(function(r) {
       return {id:r.id, desig:r.desig||'', lieu:r.lieu||'', bas:r.bas||'', haut:r.haut||'', memo:r.memo||false};
@@ -554,6 +556,7 @@ function updateDriveStatus(){
     </div>
     <div class="dossier-actions">
       <button class="btn terra" onclick="ouvrirModalNouveauDossier()"><i class="ti ti-plus" style="font-size:13px"></i> Nouvel inventaire</button>
+      <button class="btn terra" onclick="ouvrirModalNouveauDossier(true)"><i class="ti ti-car" style="font-size:13px"></i> Nouvelle estimation véhicule</button>
       <button class="btn" onclick="toggleListeDossiers()" id="btn-toggle-liste"><i class="ti ti-list" style="font-size:13px"></i> Tous les dossiers</button>
 
     </div>
@@ -669,7 +672,7 @@ function updateDriveStatus(){
 <!-- MODAL NOUVEAU DOSSIER -->
 <div class="modal-overlay" id="modal-nouveau">
   <div class="modal-box">
-    <h3><i class="ti ti-file-plus"></i> Nouvel inventaire</h3>
+    <h3 id="modal-nouveau-titre"><i class="ti ti-file-plus"></i> Nouvel inventaire</h3>
     <div class="fg"><label>Nom du dossier (ex: MARTIN Jean 2026)</label><input id="new-dos-nom" placeholder="NOM Prénom AAAA" style="font-family:inherit;font-size:13px;border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;width:100%;background:var(--bg3);color:var(--text)"/></div>
     <div class="fg"><label>Année</label>
       <select id="new-dos-annee" style="font-family:inherit;font-size:13px;border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;width:100%;background:var(--bg3);color:var(--text)">
@@ -799,8 +802,70 @@ function updateDriveStatus(){
   </div>
 </div>
 
+<!-- FICHE VÉHICULE (affichée uniquement pour un dossier "estimation véhicule") -->
+<div id="zone-vehicule" style="display:none">
+  <div class="card">
+    <div class="section-label"><i class="ti ti-car" style="font-size:14px"></i>Véhicule</div>
+    <div class="grid3">
+      <div class="fg"><label>Marque</label><input id="veh-marque" placeholder="Ex : FORD"/></div>
+      <div class="fg"><label>Modèle</label><input id="veh-modele" placeholder="Ex : MONDEO"/></div>
+      <div class="fg"><label>Immatriculation</label><input id="veh-immat" placeholder="Ex : BT-916-AT"/></div>
+      <div class="fg"><label>1ère mise en circulation</label><input type="date" id="veh-date-circulation"/></div>
+      <div class="fg"><label>Nombre de portes</label><input type="number" id="veh-portes" min="0" step="1"/></div>
+      <div class="fg"><label>Énergie</label>
+        <select id="veh-energie">
+          <option value="">—</option>
+          <option value="Essence">Essence</option>
+          <option value="Diesel">Diesel</option>
+          <option value="Électrique">Électrique</option>
+          <option value="Hybride">Hybride</option>
+          <option value="GPL">GPL</option>
+        </select>
+      </div>
+      <div class="fg"><label>Couleur</label><input id="veh-couleur"/></div>
+      <div class="fg"><label>Kilométrage</label><input type="number" id="veh-kms" min="0" step="1"/></div>
+      <div class="fg"><label>Nombre de sièges</label><input type="number" id="veh-sieges" min="0" step="1"/></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="section-label"><i class="ti ti-list-check" style="font-size:14px"></i>Équipements</div>
+    <div id="veh-equipements-grid" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 14px"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-label"><i class="ti ti-car-crash" style="font-size:14px"></i>Schéma de la carrosserie <span style="font-size:10px;font-weight:400;color:var(--tc3);margin-left:8px"><i class="ti ti-info-circle"></i> Cliquez pour poser une croix, recliquez dessus pour la retirer</span></div>
+    <div id="veh-schema-conteneur" style="max-width:320px;margin:0 auto;position:relative;cursor:crosshair"></div>
+  </div>
+
+  <div class="card">
+    <div class="section-label"><i class="ti ti-clipboard-check" style="font-size:14px"></i>État général</div>
+    <div style="display:flex;gap:10px;margin-bottom:12px" id="veh-etat-boutons"></div>
+    <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:10px">
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+        <input type="checkbox" id="veh-fiche-identif" style="width:14px;height:14px;cursor:pointer"/> Fiche d'identification jointe
+      </label>
+      <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">
+        <input type="checkbox" id="veh-carte-grise" style="width:14px;height:14px;cursor:pointer"/> Carte grise jointe
+      </label>
+    </div>
+    <div class="fg"><label>Remarques</label><textarea id="veh-remarques" rows="2"></textarea></div>
+  </div>
+
+  <div class="card">
+    <div class="section-label"><i class="ti ti-file-text" style="font-size:14px"></i>Estimation</div>
+    <div class="fg"><label>Description de l'état du véhicule (sert de base à la lettre)</label><textarea id="veh-description-etat" rows="4" placeholder="Ex : Le véhicule présente de nombreux accrocs sur la carrosserie. Le kilométrage relevé est estimé à ... km. Absence de contrôle technique."></textarea></div>
+    <div class="grid3" style="margin-top:10px">
+      <div class="fg"><label>Estimation — mise à prix (€)</label><input type="number" id="veh-estimation" min="0" step="1"/></div>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;margin-top:8px">
+      <input type="checkbox" id="veh-proposer-abandon" style="width:14px;height:14px;cursor:pointer"/> Proposer l'abandon du véhicule (faible valeur vénale)
+    </label>
+  </div>
+</div>
+
 <!-- TABLEAU — sans colonne Observations -->
-<div class="table-wrap">
+<div class="table-wrap biens-only">
   <table>
     <thead>
       <tr>
@@ -819,7 +884,7 @@ function updateDriveStatus(){
   </table>
 </div>
 
-<div class="footer-row">
+<div class="footer-row biens-only">
   <div style="display:flex;gap:8px;align-items:center">
     <button class="btn-add" onclick="addRow()"><i class="ti ti-plus" style="font-size:13px"></i> Ajouter un bien</button>
     <span style="font-size:12px;color:var(--text2)" id="count-lbl">0 bien(s)</span>
@@ -857,7 +922,7 @@ function updateDriveStatus(){
 </div>
 
 <!-- PARAMÈTRES OR -->
-<div class="card" id="params-or-bloc">
+<div class="card biens-only" id="params-or-bloc">
   <div class="section-label"><i class="ti ti-currency-euro" style="font-size:14px"></i>Paramètres — Calcul automatique des bijoux en or</div>
   <div style="display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap">
     <div class="fg" style="flex:1;min-width:160px">
@@ -892,11 +957,12 @@ function updateDriveStatus(){
 </div>
 
 <div class="actions">
-  <button class="btn pdf-btn" onclick="exportPDF()"><i class="ti ti-file-type-pdf" style="font-size:13px"></i> Exporter PDF</button>
-  <button class="btn" onclick="exportExcel()"><i class="ti ti-table" style="font-size:13px"></i> Exporter Excel</button>
+  <button class="btn pdf-btn biens-only" onclick="exportPDF()"><i class="ti ti-file-type-pdf" style="font-size:13px"></i> Exporter PDF</button>
+  <button class="btn biens-only" onclick="exportExcel()"><i class="ti ti-table" style="font-size:13px"></i> Exporter Excel</button>
+  <button class="btn pdf-btn veh-only" style="display:none" onclick="exportEstimationVehiculePDF()"><i class="ti ti-file-type-pdf" style="font-size:13px"></i> Exporter PDF estimation véhicule</button>
   <button class="btn" onclick="clearDossier()"><i class="ti ti-refresh" style="font-size:13px"></i> Nouveau dossier</button>
-  <button class="btn primary" onclick="toggleMentionAbandon()" id="btn-abandon"><i class="ti ti-alert-triangle" style="font-size:13px"></i> Mention abandon</button>
-  <button class="btn primary" onclick="toggleMentionBijoux()" id="btn-bijoux"><i class="ti ti-diamond" style="font-size:13px"></i> Mention bijoux</button>
+  <button class="btn primary biens-only" onclick="toggleMentionAbandon()" id="btn-abandon"><i class="ti ti-alert-triangle" style="font-size:13px"></i> Mention abandon</button>
+  <button class="btn primary biens-only" onclick="toggleMentionBijoux()" id="btn-bijoux"><i class="ti ti-diamond" style="font-size:13px"></i> Mention bijoux</button>
   <span id="fb-status" style="font-size:11px;color:#2a6a3a;margin-right:8px">🔴 Hors ligne</span><button class="btn" onclick="firebase.auth().signOut()" title="Se déconnecter" style="font-size:11px;padding:3px 8px;margin-right:4px;background:var(--bg3);color:var(--text2);border:1px solid var(--border);">🔓 Déco.</button><button class="btn" onclick="annuler()" title="Annuler la dernière action (Ctrl+Z)"><i class="ti ti-arrow-back-up" style="font-size:13px"></i> Annuler</button>
       <button class="btn" id="btn-drive-connect" onclick="demanderAccesDrive()" title="Connecter Google Drive pour sauvegarder les PDF">☁️ Connecter Drive</button>
       <button class="btn" style="background:#e8f4ea;border-color:#4a9a5a;color:#2a6a3a;font-weight:600" onclick="ouvrirModalMandat()"><i class="ti ti-gavel" style="font-size:13px"></i> Mandat de Vente</button>
@@ -1976,8 +2042,9 @@ function renderListeDossiers(){
       html+='<button class="dc-del" onclick="event.stopPropagation();supprimerDossier(\''+ d.id +'\')" title="Supprimer"><i class="ti ti-trash"></i></button>';
       var numLabel = (d.h&&d.h.dosNum) ? '<span style="font-size:10px;font-weight:700;color:var(--tc2);margin-right:5px">'+(d.h.dosNum)+'</span>' : '';
       var termineLabel = d.termine ? '<span style="font-size:9px;background:#2a6a3a;color:#fff;border-radius:4px;padding:1px 5px;margin-left:4px">✓ Terminé</span>' : '';
-      html+='<div class="dc-nom" title="'+(d.nom||'')+'">'+numLabel+(d.nom||'Sans nom')+termineLabel+'</div>';
-      html+='<div class="dc-info">'+(d.type||'')+' · '+nbBiens+' bien(s)</div>';
+      var vehiculeLabel = d.estimVehicule ? '<span style="font-size:9px;background:var(--tc1);color:#fff;border-radius:4px;padding:1px 5px;margin-left:4px"><i class="ti ti-car" style="font-size:9px"></i> Véhicule</span>' : '';
+      html+='<div class="dc-nom" title="'+(d.nom||'')+'">'+numLabel+(d.nom||'Sans nom')+termineLabel+vehiculeLabel+'</div>';
+      html+='<div class="dc-info">'+(d.estimVehicule?'Estimation véhicule':((d.type||'')+' · '+nbBiens+' bien(s)'))+'</div>';
       html+='<div class="dc-info" style="color:var(--text3)">'+dateCreation+'</div>';
       if(isActive)html+='<div style="margin-top:4px;font-size:10px;color:var(--tc2);font-weight:600">✓ EN COURS</div>';
       if(d.envoye)html+='<div class="dc-envoye" title="Inventaire envoyé"><i class="ti ti-check"></i></div>';
@@ -1988,10 +2055,399 @@ function renderListeDossiers(){
   el.innerHTML=html;
 }
 
-function ouvrirModalNouveauDossier(){
+var _creationEstimVehicule=false;
+function ouvrirModalNouveauDossier(estimVehicule){
+  _creationEstimVehicule=!!estimVehicule;
   document.getElementById('new-dos-nom').value='';
+  document.getElementById('modal-nouveau-titre').innerHTML=_creationEstimVehicule
+    ?'<i class="ti ti-car"></i> Nouvelle estimation véhicule'
+    :'<i class="ti ti-file-plus"></i> Nouvel inventaire';
   document.getElementById('modal-nouveau').classList.add('active');
   setTimeout(()=>document.getElementById('new-dos-nom').focus(),100);
+}
+
+function vehiculeParDefaut(){
+  return {marque:'',modele:'',immat:'',dateCirculation:'',portes:'',energie:'',couleur:'',
+    kms:'',sieges:'',equipements:{},etat:'',ficheIdentif:false,carteGrise:false,
+    remarques:'',descriptionEtat:'',proposerAbandon:false,estimation:'',dommages:[]};
+}
+
+var EQUIPEMENTS_VEHICULE=[
+  {key:'abs',label:'ABS'},
+  {key:'airbag',label:'Airbag'},
+  {key:'antivol',label:'Antivol'},
+  {key:'autoradio',label:'Autoradio'},
+  {key:'boiteAuto',label:'Boîte automatique'},
+  {key:'clim',label:'Climatisation'},
+  {key:'cuir',label:'Sièges cuir'},
+  {key:'directionAssistee',label:'Direction assistée'},
+  {key:'fermetureCentralisee',label:'Fermeture centralisée'},
+  {key:'gps',label:'GPS'},
+  {key:'jantesAlu',label:'Jantes alu'},
+  {key:'peintureMetal',label:'Peinture métallisée'},
+  {key:'regulateurVitesse',label:'Régulateur de vitesse'},
+  {key:'semiCuir',label:'Sièges semi-cuir'},
+  {key:'siegesElectriques',label:'Sièges électriques'},
+  {key:'toitOuvrant',label:'Toit ouvrant'},
+  {key:'toitPanoramique',label:'Toit panoramique'},
+  {key:'antibrouillards',label:'Antibrouillards'},
+  {key:'vitresElectriques',label:'Vitres électriques'},
+  {key:'roueSecours',label:'Roue de secours'},
+  {key:'radarAr',label:'Radar de recul (AR)'}
+];
+
+function appliquerModeDossier(estimVehicule){
+  document.querySelectorAll('.biens-only').forEach(function(el){el.style.display=estimVehicule?'none':'';});
+  document.querySelectorAll('.veh-only').forEach(function(el){el.style.display=estimVehicule?'':'none';});
+  var zone=document.getElementById('zone-vehicule');
+  if(zone)zone.style.display=estimVehicule?'block':'none';
+}
+
+function getVehicule(){
+  var d=allDossiers[currentDossierId];
+  if(!d||!d.estimVehicule)return d?d.vehicule:null;
+  var equipements={};
+  EQUIPEMENTS_VEHICULE.forEach(function(eq){
+    var el=document.getElementById('veh-eq-'+eq.key);
+    equipements[eq.key]=el?el.checked:false;
+  });
+  return {
+    marque:v('veh-marque'),modele:v('veh-modele'),immat:v('veh-immat'),
+    dateCirculation:v('veh-date-circulation'),portes:v('veh-portes'),
+    energie:v('veh-energie'),couleur:v('veh-couleur'),kms:v('veh-kms'),
+    sieges:v('veh-sieges'),equipements:equipements,
+    etat:(d.vehicule&&d.vehicule.etat)||'',
+    ficheIdentif:document.getElementById('veh-fiche-identif')?document.getElementById('veh-fiche-identif').checked:false,
+    carteGrise:document.getElementById('veh-carte-grise')?document.getElementById('veh-carte-grise').checked:false,
+    remarques:v('veh-remarques'),descriptionEtat:v('veh-description-etat'),
+    proposerAbandon:document.getElementById('veh-proposer-abandon')?document.getElementById('veh-proposer-abandon').checked:false,
+    estimation:v('veh-estimation'),
+    dommages:(d.vehicule&&d.vehicule.dommages)||[]
+  };
+}
+
+function renderVehiculeEquipements(vehicule){
+  var grid=document.getElementById('veh-equipements-grid');
+  if(!grid)return;
+  var html='';
+  EQUIPEMENTS_VEHICULE.forEach(function(eq){
+    var checked=vehicule&&vehicule.equipements&&vehicule.equipements[eq.key]?'checked':'';
+    html+='<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer">'+
+      '<input type="checkbox" id="veh-eq-'+eq.key+'" '+checked+' style="width:14px;height:14px;cursor:pointer"/> '+eq.label+'</label>';
+  });
+  grid.innerHTML=html;
+}
+
+function renderVehiculeEtatBoutons(vehicule){
+  var conteneur=document.getElementById('veh-etat-boutons');
+  if(!conteneur)return;
+  var etats=[{v:'BON',c:'#2a6a3a'},{v:'MOYEN',c:'#b8860b'},{v:'MAUVAIS',c:'#c0392b'}];
+  var etatActuel=vehicule?vehicule.etat:'';
+  var html='';
+  etats.forEach(function(e){
+    var actif=etatActuel===e.v;
+    html+='<button type="button" onclick="choisirEtatVehicule(\''+e.v+'\')" style="flex:1;padding:8px;border-radius:var(--radius);cursor:pointer;font-size:12px;font-weight:600;border:2px solid '+e.c+';background:'+(actif?e.c:'transparent')+';color:'+(actif?'#fff':e.c)+'">'+e.v+'</button>';
+  });
+  conteneur.innerHTML=html;
+}
+
+function choisirEtatVehicule(etat){
+  var d=allDossiers[currentDossierId];
+  if(!d)return;
+  if(!d.vehicule)d.vehicule=vehiculeParDefaut();
+  d.vehicule.etat=etat;
+  renderVehiculeEtatBoutons(d.vehicule);
+  autosave();
+}
+
+// ── SCHÉMA DE CARROSSERIE (vue de dessus, clic pour poser/retirer une croix rouge) ──
+function svgCarrosserieBase(){
+  return '<svg id="veh-schema-svg" viewBox="0 0 200 400" style="width:100%;height:auto;display:block;background:#fff;border:1px solid var(--border);border-radius:8px" xmlns="http://www.w3.org/2000/svg">'+
+    '<rect x="15" y="15" width="170" height="370" rx="45" ry="45" fill="none" stroke="#555" stroke-width="2"/>'+
+    '<circle cx="30" cy="95" r="18" fill="none" stroke="#555" stroke-width="2"/>'+
+    '<circle cx="170" cy="95" r="18" fill="none" stroke="#555" stroke-width="2"/>'+
+    '<circle cx="30" cy="305" r="18" fill="none" stroke="#555" stroke-width="2"/>'+
+    '<circle cx="170" cy="305" r="18" fill="none" stroke="#555" stroke-width="2"/>'+
+    '<rect x="55" y="130" width="90" height="140" fill="none" stroke="#555" stroke-width="1.5"/>'+
+    '<polygon points="60,130 140,130 125,90 75,90" fill="none" stroke="#555" stroke-width="1.5"/>'+
+    '<polygon points="60,270 140,270 125,310 75,310" fill="none" stroke="#555" stroke-width="1.5"/>'+
+    '<line x1="100" y1="130" x2="100" y2="270" stroke="#555" stroke-width="1"/>'+
+    '</svg>';
+}
+
+function renderSchemaDommages(){
+  var conteneur=document.getElementById('veh-schema-conteneur');
+  if(!conteneur)return;
+  conteneur.innerHTML=svgCarrosserieBase();
+  var svg=document.getElementById('veh-schema-svg');
+  var d=allDossiers[currentDossierId];
+  var dommages=(d&&d.vehicule&&d.vehicule.dommages)||[];
+  dommages.forEach(function(pt,i){
+    var marque=document.createElementNS('http://www.w3.org/2000/svg','text');
+    marque.setAttribute('x',pt.xPct*2);
+    marque.setAttribute('y',pt.yPct*4);
+    marque.setAttribute('fill','#c0392b');
+    marque.setAttribute('font-size','22');
+    marque.setAttribute('font-weight','bold');
+    marque.setAttribute('text-anchor','middle');
+    marque.setAttribute('dominant-baseline','middle');
+    marque.setAttribute('data-idx',i);
+    marque.style.cursor='pointer';
+    marque.textContent='✕';
+    svg.appendChild(marque);
+  });
+  svg.onclick=function(e){
+    var d2=allDossiers[currentDossierId];
+    if(!d2)return;
+    if(!d2.vehicule)d2.vehicule=vehiculeParDefaut();
+    var liste=d2.vehicule.dommages||[];
+    if(e.target.tagName==='text'){
+      var idx=parseInt(e.target.getAttribute('data-idx'));
+      liste.splice(idx,1);
+    } else {
+      var rect=svg.getBoundingClientRect();
+      var xPct=((e.clientX-rect.left)/rect.width)*100;
+      var yPct=((e.clientY-rect.top)/rect.height)*100;
+      liste.push({xPct:xPct,yPct:yPct});
+    }
+    d2.vehicule.dommages=liste;
+    renderSchemaDommages();
+    autosave();
+  };
+}
+
+// ── EXPORT PDF — DOSSIER D'ESTIMATION VÉHICULE (3 pages) ──────────────────
+async function exportEstimationVehiculePDF(){
+  if(!currentDossierId)return;
+  var d=allDossiers[currentDossierId];
+  if(!d||!d.estimVehicule){alert("Ce dossier n'est pas une estimation véhicule.");return;}
+  sauverDossierEnCours();
+
+  if(!window.jspdf){
+    await new Promise(function(resolve,reject){
+      var s1=document.createElement('script');
+      s1.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s1.onload=function(){var s2=document.createElement('script');s2.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';s2.onload=resolve;s2.onerror=reject;document.head.appendChild(s2);};
+      s1.onerror=reject;document.head.appendChild(s1);
+    }).catch(function(){alert('Impossible de charger jsPDF.');});
+    if(!window.jspdf)return;
+  }
+
+  var h=d.h||{};
+  var veh=d.vehicule||vehiculeParDefaut();
+  var jsPDF=window.jspdf.jsPDF;
+  var doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  var W=210,MG=12,CW=W-MG*2;
+  var TC1=[122,46,26],TC2=[160,74,42],TC3=[196,118,74],TC4=[232,176,144],TC5=[245,235,228],TC6=[250,243,238];
+  var WHITE=[255,255,255],BLACK=[26,8,4],GREY=[240,232,224],ROUGE=[192,57,43];
+
+  function sf(b,sz,c){doc.setFont('helvetica',b?'bold':'normal');doc.setFontSize(sz||10);var cl=c||BLACK;doc.setTextColor(cl[0],cl[1],cl[2]);}
+  function fill(c){doc.setFillColor(c[0],c[1],c[2]);}
+  function drw(c){doc.setDrawColor(c[0],c[1],c[2]);}
+  function lw(n){doc.setLineWidth(n);}
+  function fd2(dte){if(!dte)return'';if(dte.indexOf('/')!==-1)return dte;var p=dte.split('-');return p[2]+'/'+p[1]+'/'+p[0];}
+  function enTete(y){
+    fill(TC6);drw(TC3);lw(0.5);
+    doc.rect(MG,y,CW,38,'FD');
+    try{doc.addImage(LOGO_B64,'JPEG',MG+1,y+2,34,34,'logo','FAST');}catch(e){}
+    sf(true,15,TC3);doc.text('Me FAGIANO Katia',MG+38,y+9);
+    sf(false,10,TC2);doc.text('SELARLU',MG+38,y+16);
+    drw(TC3);lw(0.8);doc.line(MG+38,y+18,MG+38+86,y+18);
+    sf(true,7.5,TC3);doc.text('COMMISSAIRE DE JUSTICE  |  COMMISSAIRE-PRISEUR JUDICIAIRE',MG+38,y+22);
+    drw(TC3);lw(0.3);doc.line(MG+38,y+24,MG+38+86,y+24);
+    sf(false,7,TC3);doc.text('Parcs Encheres, RN8 ZI St Mitre, 13400 Aubagne  |  04 42 84 07 38',MG+38,y+28);
+    sf(false,7,TC3);doc.text('hoteldesventes.aubagne@gmail.com  |  www.parcsencheres.com',MG+38,y+33);
+    return y+43;
+  }
+  function dessinerCarrosserie(bx,by,bw){
+    var s=bw/200,bh=400*s;
+    function mp(px,py){return [bx+px*s,by+py*s];}
+    function seg(p1,p2){var a=mp(p1[0],p1[1]),b=mp(p2[0],p2[1]);doc.line(a[0],a[1],b[0],b[1]);}
+    drw([85,85,85]);lw(0.4);
+    doc.roundedRect(bx+15*s,by+15*s,170*s,370*s,45*s,45*s,'S');
+    doc.circle(bx+30*s,by+95*s,18*s,'S');
+    doc.circle(bx+170*s,by+95*s,18*s,'S');
+    doc.circle(bx+30*s,by+305*s,18*s,'S');
+    doc.circle(bx+170*s,by+305*s,18*s,'S');
+    doc.rect(bx+55*s,by+130*s,90*s,140*s,'S');
+    seg([60,130],[140,130]);seg([140,130],[125,90]);seg([125,90],[75,90]);seg([75,90],[60,130]);
+    seg([60,270],[140,270]);seg([140,270],[125,310]);seg([125,310],[75,310]);seg([75,310],[60,270]);
+    seg([100,130],[100,270]);
+    drw(ROUGE);lw(0.7);
+    (veh.dommages||[]).forEach(function(pt){
+      var px=pt.xPct*2,py=pt.yPct*4;
+      var c=mp(px,py),r=3;
+      doc.line(c[0]-r,c[1]-r,c[0]+r,c[1]+r);
+      doc.line(c[0]-r,c[1]+r,c[0]+r,c[1]-r);
+    });
+    return bh;
+  }
+  function dessinerEquipements(ex,ey){
+    var yy=ey;
+    sf(true,9,TC1);doc.text('Équipements',ex,yy);yy+=6;
+    EQUIPEMENTS_VEHICULE.forEach(function(eq){
+      var checked=veh.equipements&&veh.equipements[eq.key];
+      drw(BLACK);lw(0.25);
+      doc.rect(ex,yy-2.5,3,3);
+      if(checked){doc.line(ex,yy-2.5,ex+3,yy+0.5);doc.line(ex,yy+0.5,ex+3,yy-2.5);}
+      sf(false,7.5,BLACK);doc.text(eq.label,ex+5,yy);
+      yy+=5.2;
+    });
+    return yy;
+  }
+
+  var vehiculeTexte=((veh.marque||'')+' '+(veh.modele||'')).trim()||'Véhicule';
+  var protegeTexte=h.dosPersonne||'—';
+
+  // ═══════ PAGE 1 : PAGE DE GARDE ═══════
+  var y=11;
+  y=enTete(y);
+  fill(TC1);doc.rect(MG,y,CW,9,'F');
+  sf(true,11,WHITE);doc.text("DOSSIER D'ESTIMATION VÉHICULE",W/2,y+6,{align:'center'});
+  y+=15;
+  sf(true,12,TC1);doc.text(vehiculeTexte,MG,y);y+=7;
+  sf(false,9,BLACK);
+  doc.text('Immatriculation : '+(veh.immat||'—'),MG,y);y+=6;
+  doc.text('N° de dossier : '+(h.dosNum||'—'),MG,y);y+=6;
+  doc.text('Estimation réalisée le : '+fd2(new Date().toISOString().split('T')[0]),MG,y);y+=10;
+
+  sf(true,9.5,TC1);doc.text('À la requête de :',MG,y);y+=6;
+  sf(false,9,BLACK);
+  var requeteTexte=(h.mandNom||'')+(h.mandOrg?', '+h.mandOrg:'')+(h.mandAdresse?', demeurant '+h.mandAdresse:'');
+  var wRequete=doc.splitTextToSize(requeteTexte,CW);
+  doc.text(wRequete,MG,y);y+=wRequete.length*4.5+4;
+
+  var wQualite=doc.splitTextToSize('Nommé(e) en qualité de '+(h.mandOrg||'mandataire')+' de '+protegeTexte,CW);
+  doc.text(wQualite,MG,y);y+=wQualite.length*4.5+2;
+  doc.text('Par jugement du '+(h.mandTribunal||'—')+' en date du '+fd2(h.mandJugement),MG,y);y+=14;
+
+  sf(false,9,BLACK);
+  doc.text('Estimation réalisée par :',MG,y);
+  doc.text('Maître Katia FAGIANO',MG+CW/2,y);y+=5;
+  doc.text('Commissaire-Priseur Judiciaire',MG,y);
+  doc.text('Commissaire de Justice',MG+CW/2,y);y+=10;
+  doc.text("Annexes : Photos, fiche d'identification",MG,y);
+
+  // ═══════ PAGE 2 : LETTRE AU MANDATAIRE ═══════
+  doc.addPage();y=11;
+  y=enTete(y);
+  y+=4;
+  sf(false,9.5,BLACK);
+  doc.text('Madame, Monsieur,',MG,y);y+=8;
+  var intro="Dans le cadre du dossier sus-référencé, je fais suite à l'estimation demandée concernant :";
+  var wIntro=doc.splitTextToSize(intro,CW);
+  doc.text(wIntro,MG,y);y+=wIntro.length*4.5+4;
+  doc.text('Le véhicule : '+vehiculeTexte,MG,y);y+=5.5;
+  doc.text('Immatriculé : '+(veh.immat||'—'),MG,y);y+=9;
+
+  if(veh.descriptionEtat){
+    var wDesc=doc.splitTextToSize(veh.descriptionEtat,CW);
+    doc.text(wDesc,MG,y);y+=wDesc.length*4.5+6;
+  }
+  doc.text('De ce fait, à la vue de ces éléments,',MG,y);y+=8;
+  sf(true,10,TC1);
+  doc.text("J'estime ce véhicule à "+(veh.estimation||'0')+' € (mise à prix)',MG,y);y+=5.5;
+  sf(false,8,BLACK);
+  var wReserve=doc.splitTextToSize("(Sous réserve qu'il n'y ait pas de problèmes mécaniques majeurs au contrôle technique et expertise à venir)",CW);
+  doc.text(wReserve,MG,y);y+=wReserve.length*4+6;
+
+  if(veh.proposerAbandon){
+    sf(false,9,BLACK);
+    var txtAbandon="Compte tenu de la faible valeur vénale du véhicule, il y aurait lieu de faire abandon de celui-ci. En effet, les frais légaux de vente, de transport, de publicité et le coût du contrôle technique seraient supérieurs au produit de la vente, rendant celle-ci déficitaire.";
+    var wAbandon=doc.splitTextToSize(txtAbandon,CW);
+    doc.text(wAbandon,MG,y);y+=wAbandon.length*4.5+6;
+  }
+
+  doc.text('Je reste à votre entière disposition pour plus de renseignements,',MG,y);y+=7;
+  doc.text('La durée de validité de cette estimation est de 3 mois.',MG,y);y+=7;
+  var wPolitesse=doc.splitTextToSize('Et vous prie d\'agréer, Madame, Monsieur, mes salutations les meilleures.',CW);
+  doc.text(wPolitesse,MG,y);y+=wPolitesse.length*4.5+10;
+  sf(true,9,BLACK);doc.text('Maître FAGIANO Katia',MG+CW-2,y,{align:'right'});y+=16;
+
+  if(y>250){doc.addPage();y=16;}
+  sf(false,7,TC2);
+  var wRgpd=doc.splitTextToSize('"Dans le cadre de nos activités, nous sommes amenés à collecter des données à caractère personnel. Vous disposez d\'un droit d\'accès, de rectification et d\'opposition sur vos données personnelles en vous adressant par tout moyen directement à notre étude. Nous pourrons utiliser ces données afin de satisfaire à nos obligations légales et aux fins d\'exercice de notre activité. Ces données pourront également être communiquées aux autorités compétentes dès lors que la réglementation l\'impose."',CW);
+  doc.text(wRgpd,MG,y);
+
+  // ═══════ PAGE 3 : FICHE ESTIMATION VÉHICULE ═══════
+  doc.addPage();y=16;
+  fill(TC1);doc.rect(MG,y,CW,9,'F');
+  sf(true,11,WHITE);doc.text('FICHE ESTIMATION VÉHICULE',W/2,y+6,{align:'center'});
+  y+=13;
+
+  var infoR=[
+    ['Protégé',protegeTexte,'Immatriculation',veh.immat||''],
+    ['Localisation véhicule',h.dosAdresse||'','',''],
+    ['Marque',veh.marque||'','Modèle',veh.modele||''],
+    ['1ère mise en circulation',fd2(veh.dateCirculation),'Nb portes',veh.portes||''],
+    ['Énergie',veh.energie||'','Couleur',veh.couleur||''],
+    ['Kilométrage',veh.kms?veh.kms+' km':'','Nb sièges',veh.sieges||'']
+  ];
+  infoR.forEach(function(row,i){
+    var bg=i%2===0?GREY:TC6;
+    if(row[2]===''){
+      fill(bg);doc.rect(MG,y,CW,8,'F');
+      drw(TC4);lw(0.2);doc.rect(MG,y,CW,8,'S');
+      sf(true,7.5,TC2);doc.text(row[0],MG+1.5,y+5);
+      sf(false,7.5,BLACK);doc.text(row[1]||'—',MG+42,y+5);
+      y+=8;return;
+    }
+    fill(bg);doc.rect(MG,y,CW/2,8,'F');doc.rect(MG+CW/2,y,CW/2,8,'F');
+    drw(TC4);lw(0.2);doc.rect(MG,y,CW/2,8,'S');doc.rect(MG+CW/2,y,CW/2,8,'S');
+    sf(true,7.5,TC2);doc.text(row[0],MG+1.5,y+5);
+    sf(false,7.5,BLACK);doc.text(String(row[1]||'—'),MG+42,y+5);
+    sf(true,7.5,TC2);doc.text(row[2],MG+CW/2+1.5,y+5);
+    sf(false,7.5,BLACK);doc.text(String(row[3]||'—'),MG+CW/2+30,y+5);
+    y+=8;
+  });
+  y+=6;
+
+  var yZoneStart=y;
+  dessinerCarrosserie(MG,yZoneStart,75);
+  var yEquip=dessinerEquipements(MG+90,yZoneStart+5);
+  y=Math.max(yZoneStart+75*2+8,yEquip)+4;
+
+  if(y>240){doc.addPage();y=16;}
+  sf(true,9,TC1);doc.text('État général :',MG,y+5.5);
+  var etats=[{v:'BON',c:[42,106,58]},{v:'MOYEN',c:[184,134,11]},{v:'MAUVAIS',c:[192,57,43]}];
+  var ex=MG+35;
+  etats.forEach(function(e){
+    var actif=veh.etat===e.v;
+    if(actif){fill(e.c);doc.rect(ex,y,26,8,'F');sf(true,8,WHITE);}
+    else{drw(e.c);lw(0.3);doc.rect(ex,y,26,8,'S');sf(false,8,e.c);}
+    doc.text(e.v,ex+13,y+5.5,{align:'center'});
+    ex+=29;
+  });
+  y+=13;
+
+  function caseACocher(label,checked,x,yy){
+    drw(BLACK);lw(0.25);doc.rect(x,yy-2.5,3,3);
+    if(checked){doc.line(x,yy-2.5,x+3,yy+0.5);doc.line(x,yy+0.5,x+3,yy-2.5);}
+    sf(false,8.5,BLACK);doc.text(label,x+5,yy);
+  }
+  caseACocher("Fiche d'identification jointe",!!veh.ficheIdentif,MG,y);
+  caseACocher('Carte grise jointe',!!veh.carteGrise,MG+90,y);
+  y+=8;
+
+  if(veh.remarques){
+    if(y>250){doc.addPage();y=16;}
+    sf(true,8.5,TC1);doc.text('Remarques :',MG,y);y+=5;
+    sf(false,8.5,BLACK);
+    var wRem=doc.splitTextToSize(veh.remarques,CW);
+    doc.text(wRem,MG,y);y+=wRem.length*4+4;
+  }
+
+  // Pied de page (mentions légales + numérotation sur toutes les pages)
+  var totalPages=doc.internal.getNumberOfPages();
+  for(var pageNum=1;pageNum<=totalPages;pageNum++){
+    doc.setPage(pageNum);
+    sf(false,7,TC2);
+    doc.text('N° TVA IC : FR52 918 901 836 - SIREN : 918 901 836 - www.parcsencheres.com',MG+CW/2,290,{align:'center'});
+    doc.text('Page '+pageNum+' / '+totalPages,MG+CW,290,{align:'right'});
+  }
+
+  var nomFichier='Estimation_Vehicule_'+(d.nom||'dossier').replace(/\s+/g,'_')+(h.dosNum?'_'+h.dosNum:'')+'.pdf';
+  doc.save(nomFichier);
 }
 
 function fermerModalNouveauDossier(){
@@ -2029,7 +2485,9 @@ function creerNouveauDossier(){
     dateCreation:Date.now(),
     h:{dosType:type,dosNum:numAuto,dosDate:'',dosHeure:'',dosPersonne:'',dosAdresse:'',
        mandNom:'',mandOrg:'',mandAdresse:'',mandTribunal:'',mandJugement:'',mandVille:''},
-    rows:[],photos:[]
+    rows:[],photos:[],
+    estimVehicule:_creationEstimVehicule,
+    vehicule:_creationEstimVehicule?vehiculeParDefaut():null
   };
   sauverTousDossiers();
   fermerModalNouveauDossier();
@@ -2089,7 +2547,27 @@ function ouvrirDossier(id){
   });
   updateTermineCheckbox();
   updateEnvoyeCheckbox();
-  
+
+  // Mode véhicule vs biens mobiliers
+  appliquerModeDossier(!!d.estimVehicule);
+  if(d.estimVehicule){
+    if(!d.vehicule)d.vehicule=vehiculeParDefaut();
+    var veh=d.vehicule;
+    var mapVeh={marque:'veh-marque',modele:'veh-modele',immat:'veh-immat',dateCirculation:'veh-date-circulation',
+      portes:'veh-portes',energie:'veh-energie',couleur:'veh-couleur',kms:'veh-kms',sieges:'veh-sieges',
+      remarques:'veh-remarques',descriptionEtat:'veh-description-etat',estimation:'veh-estimation'};
+    Object.keys(mapVeh).forEach(function(k){
+      var el=document.getElementById(mapVeh[k]);
+      if(el)el.value=veh[k]!=null?veh[k]:'';
+    });
+    var elFiche=document.getElementById('veh-fiche-identif');if(elFiche)elFiche.checked=!!veh.ficheIdentif;
+    var elCarte=document.getElementById('veh-carte-grise');if(elCarte)elCarte.checked=!!veh.carteGrise;
+    var elAbandon=document.getElementById('veh-proposer-abandon');if(elAbandon)elAbandon.checked=!!veh.proposerAbandon;
+    renderVehiculeEquipements(veh);
+    renderVehiculeEtatBoutons(veh);
+    renderSchemaDommages();
+  }
+
   // Mettre à jour le badge
   const badge=document.getElementById('badge-dossier-actif');
   badge.textContent=d.nom;badge.style.display='inline';
@@ -2108,11 +2586,12 @@ function ouvrirDossier(id){
 function sauverDossierEnCours(){
   if(!currentDossierId)return;
   const h=getH();
+  const vehicule=getVehicule();
   // On ne sauvegarde PAS les photos (trop lourdes pour localStorage)
   // Les photos restent disponibles pendant la session uniquement
   allDossiers[currentDossierId]={
     ...allDossiers[currentDossierId],
-    h,rows,
+    h,rows,vehicule,
     dateMaj:Date.now()
   };
   sauverTousDossiers();
