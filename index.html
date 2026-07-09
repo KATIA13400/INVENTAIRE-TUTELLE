@@ -2475,7 +2475,7 @@ async function exportEstimationVehiculePDF(){
   var y=11;
   y=enTete(y);
   fill(TC1);doc.rect(MG,y,CW,9,'F');
-  sf(true,11,WHITE);doc.text("PROCÈS-VERBAL D'ESTIMATION VÉHICULE",W/2,y+6,{align:'center'});
+  sf(true,11,WHITE);doc.text("PROCÈS-VERBAL D'ESTIMATION DE VÉHICULE",W/2,y+6,{align:'center'});
   y+=17;
   sf(true,12,TC1);doc.text(vehiculeTexte+(veh.immat?' — '+veh.immat:''),MG,y);y+=8;
 
@@ -2509,14 +2509,12 @@ async function exportEstimationVehiculePDF(){
   }
   function sousTitre(texte){
     if(y>270){doc.addPage();y=16;}
-    fill(TC3);doc.rect(MG,y,CW,7,'F');
+    fill(TC1);doc.rect(MG,y,CW,7,'F');
     sf(true,9,WHITE);doc.text(texte,MG+3,y+5);
     y+=7;
   }
 
   ligneInfo('N° de dossier',h.dosNum,'Date de l\'estimation',fd2(new Date().toISOString().split('T')[0]));
-
-  sousTitre('PROTÉGÉ, MANDATAIRE ET COMMISSAIRE-PRISEUR');
   ligneInfo('Protégé',protegeTexte,'Réalisée par',veh.realisePar||'Maître Katia FAGIANO');
   ligneInfo('Mandataire',h.mandNom,'Organisation',h.mandOrg);
   ligneInfo('Adresse mandataire',h.mandAdresse,'Tribunal',h.mandTribunal+(h.mandJugement?' - ord. du '+fd2(h.mandJugement):''));
