@@ -811,7 +811,13 @@ function updateDriveStatus(){
 
 <!-- EXPERTISE -->
 <div class="card expertise-card">
-  <div class="section-label gold"><i class="ti ti-sparkles" style="font-size:15px"></i>Expertise instantanée — Prisée par photo(s)<span class="photo-count-badge" id="exp-count-badge" style="display:none"></span></div>
+  <div class="section-label gold" style="justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <span><i class="ti ti-sparkles" style="font-size:15px"></i>Expertise instantanée — Prisée par photo(s)<span class="photo-count-badge" id="exp-count-badge" style="display:none"></span></span>
+    <span style="display:flex;gap:6px">
+      <a href="https://atlas.interencheres.com/v2/base-adjudications" target="_blank" rel="noopener" class="btn" style="text-decoration:none;font-size:11px"><i class="ti ti-external-link" style="font-size:12px"></i> Interenchères Atlas</a>
+      <a href="https://fr.artprice.com/" target="_blank" rel="noopener" class="btn" style="text-decoration:none;font-size:11px"><i class="ti ti-external-link" style="font-size:12px"></i> Artprice</a>
+    </span>
+  </div>
   <div class="exp-top">
     <div class="exp-photos-col">
       <div class="exp-drop-zone" id="exp-drop-zone" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleExpDrop(event)" onclick="document.getElementById('exp-img-input').click()">
