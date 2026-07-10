@@ -2507,19 +2507,20 @@ async function exportEstimationVehiculePDF(){
     y+=rh;
   }
   function sousTitre(texte){
-    if(y>270){doc.addPage();y=16;}
-    fill(TC1);doc.rect(MG,y,CW,7,'F');
-    sf(true,9,WHITE);doc.text(texte,W/2,y+5,{align:'center'});
-    y+=7;
+    if(y>268){doc.addPage();y=16;}
+    fill(TC1);doc.rect(MG,y,CW,9,'F');
+    sf(true,11,WHITE);doc.text(texte,W/2,y+6,{align:'center'});
+    y+=9;
   }
 
   ligneInfo('Commissaire de Justice',veh.realisePar||'Maître Katia FAGIANO','N. Inventaire',h.dosNum);
   ligneInfo('Etude','SELARLU FAGIANO Katia','Date',fd2(new Date().toISOString().split('T')[0]));
   ligneInfo('Protégé',protegeTexte,'Heure','');
-  ligneInfo('L\'adresse du protégé',h.dosAdresse,'Type de procedure',h.dosType);
+  ligneInfo('Adresse du protégé',h.dosAdresse,'Type de procedure',h.dosType);
   ligneInfo('Mandataire',h.mandNom,'Organisation',h.mandOrg);
   ligneInfo('Adresse mandataire',h.mandAdresse,'Tribunal',h.mandTribunal+(h.mandJugement?' - ord. du '+fd2(h.mandJugement):''));
 
+  y+=5;
   sousTitre('VÉHICULE');
   ligneInfo('Marque',veh.marque,'Modèle',veh.modele);
   ligneInfo('Immatriculation',veh.immat,'1ère MEC',fd2(veh.dateCirculation));
@@ -2529,9 +2530,11 @@ async function exportEstimationVehiculePDF(){
   ligneInfo('État du véhicule',veh.descriptionEtat,'','');
   y+=6;
 
-  // Fiche descriptive (schéma + équipements) — toujours sur une nouvelle page
+  // Fiches descriptives (schéma + équipements) — toujours sur une nouvelle page
   doc.addPage();y=16;
-  sf(true,12,ROUGE);doc.text('Fiche descriptive',MG,y);y+=8;
+  fill(TC1);doc.rect(MG,y,CW,9,'F');
+  sf(true,11,WHITE);doc.text('FICHES DESCRIPTIVES',W/2,y+6,{align:'center'});
+  y+=15;
   var hauteurSchemaPrevue=dimensionsSchema(75);
   var yZoneStart=y;
   dessinerSchema(MG,yZoneStart,75);
@@ -2589,7 +2592,8 @@ async function exportEstimationVehiculePDF(){
   var recapH=Math.max(14,wEstLettres.length*4.5+6);
   fill(TC5);drw(TC4);lw(0.3);
   doc.rect(MG,y,leftW,recapH,'FD');doc.rect(MG+leftW,y,rightW,recapH,'FD');
-  doc.text(wEstLettres,MG+2,y+5.5);
+  var startYGauche=y+recapH/2-((wEstLettres.length-1)*4.5)/2+2;
+  doc.text(wEstLettres,MG+2,startYGauche);
   sf(true,13,TC1);doc.text(fmtEstimation(veh.estimation)+' €',MG+CW-3,y+recapH/2+2,{align:'right'});
   y+=recapH+4;
   sf(false,7.5,BLACK);
@@ -2614,10 +2618,10 @@ async function exportEstimationVehiculePDF(){
   doc.text('Et signé après lecture,',MG,y);y+=8;
   sf(true,11,TC1);doc.text('Maître Katia FAGIANO',MG,y);y+=2;
   try{doc.addImage(SIG_B64,'JPEG',MG-2,y,58,44,'sig','FAST');}catch(e){console.warn('Sig:',e);}
-  y+=46;
+  y+=54;
 
   // ── MENTION RGPD (tout à la fin, après la signature et le tampon) ──
-  if(y>270){doc.addPage();y=16;}
+  if(y>262){doc.addPage();y=16;}
   sf(false,7,TC2);
   var wRgpd=doc.splitTextToSize('"Dans le cadre de nos activités, nous sommes amenés à collecter des données à caractère personnel. Vous disposez d\'un droit d\'accès, de rectification et d\'opposition sur vos données personnelles en vous adressant par tout moyen directement à notre étude. Nous pourrons utiliser ces données afin de satisfaire à nos obligations légales et aux fins d\'exercice de notre activité. Ces données pourront également être communiquées aux autorités compétentes dès lors que la réglementation l\'impose."',CW);
   doc.text(wRgpd,MG,y);y+=wRgpd.length*3.6+8;
