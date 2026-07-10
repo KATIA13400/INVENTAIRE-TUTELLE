@@ -199,6 +199,8 @@ td textarea{overflow:hidden;line-height:1.5;min-height:28px}
 <style>
 #dossier-zone{display:none}
 #dossier-zone.visible{display:block}
+#succession-zone{display:none}
+#succession-zone.visible{display:block}
 </style>
 
 <style id="autosave-style">
@@ -551,7 +553,7 @@ function updateDriveStatus(){
   <div class="dossier-header">
     <div class="dossier-title">
       <i class="ti ti-folders" style="font-size:18px"></i>
-      Mes inventaires
+      Mes inventaires de tutelle
       <span class="badge-actif" id="badge-dossier-actif" style="display:none"></span>
     </div>
     <div class="dossier-actions">
@@ -586,6 +588,82 @@ function updateDriveStatus(){
     <div id="mandats-contenu"><div class="empty-dossiers">Aucun mandat enregistré. Créez votre premier mandat !</div></div>
   </div>
 </div>
+
+<!-- SECTION INVENTAIRES SUCCESSORAUX -->
+<div class="dossier-manager" style="margin-top:1rem">
+  <div class="dossier-header">
+    <div class="dossier-title">
+      <i class="ti ti-scale" style="font-size:18px"></i>
+      Mes inventaires successoraux
+      <span class="badge-actif" id="badge-succession-actif" style="display:none"></span>
+    </div>
+    <div class="dossier-actions">
+      <button class="btn terra" onclick="ouvrirModalNouvelleSuccession()"><i class="ti ti-plus" style="font-size:13px"></i> Nouvel inventaire successoral</button>
+      <button class="btn" onclick="toggleListeSuccessions()" id="btn-toggle-successions"><i class="ti ti-list" style="font-size:13px"></i> Tous les inventaires successoraux</button>
+    </div>
+  </div>
+  <div id="liste-successions" style="display:none">
+    <div id="successions-contenu"><div class="empty-dossiers">Aucun inventaire successoral enregistré. Créez le premier !</div></div>
+  </div>
+</div>
+
+<!-- MODAL NOUVEL INVENTAIRE SUCCESSORAL -->
+<div class="modal-overlay" id="modal-nouvelle-succession">
+  <div class="modal-box">
+    <h3><i class="ti ti-scale"></i> Nouvel inventaire successoral</h3>
+    <div class="fg"><label>Nom du dossier (ex : Succession MARTIN Jean)</label><input id="new-succ-nom" placeholder="Succession NOM Prénom" style="font-family:inherit;font-size:13px;border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;width:100%;background:var(--bg3);color:var(--text)"/></div>
+    <div class="fg"><label>Année</label>
+      <select id="new-succ-annee" style="font-family:inherit;font-size:13px;border:1px solid var(--border);border-radius:var(--radius);padding:7px 10px;width:100%;background:var(--bg3);color:var(--text)">
+        <option>2024</option><option>2025</option><option selected>2026</option><option>2027</option><option>2028</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="fermerModalNouvelleSuccession()">Annuler</button>
+      <button class="btn terra" onclick="creerNouvelleSuccession()"><i class="ti ti-check"></i> Créer</button>
+    </div>
+  </div>
+</div>
+
+<!-- ZONE ÉDITION INVENTAIRE SUCCESSORAL -->
+<div id="succession-zone">
+<div class="card">
+  <div class="section-label" style="justify-content:space-between">
+    <span><i class="ti ti-scale" style="font-size:14px"></i>Inventaire successoral en cours</span>
+  </div>
+  <div class="grid3">
+    <div class="fg"><label>Nom du dossier</label><input id="succ-nom"/></div>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        <th style="width:40px;text-align:center;background:var(--tc1);color:#fff;">N°</th>
+        <th style="background:var(--tc1);color:#fff;">Désignation du bien</th>
+        <th style="width:16%;background:var(--tc1);color:#fff;">Emplacement</th>
+        <th style="width:16%;text-align:right;background:var(--tc1);color:#fff;">Estimation (€)</th>
+        <th style="width:30px;background:var(--tc1);"></th>
+      </tr>
+    </thead>
+    <tbody id="succession-body"></tbody>
+  </table>
+</div>
+
+<div class="footer-row">
+  <div style="display:flex;gap:8px;align-items:center">
+    <button class="btn-add" onclick="ajouterLigneSuccession()"><i class="ti ti-plus" style="font-size:13px"></i> Ajouter un bien</button>
+  </div>
+  <div class="totals-block">
+    <div class="tot"><span class="tot-label">Total de la Prisée</span><span class="tot-val" id="succession-total">0,00 €</span></div>
+  </div>
+</div>
+
+<div class="actions">
+  <button class="btn pdf-btn" onclick="exportSuccessionPDF()"><i class="ti ti-file-type-pdf" style="font-size:13px"></i> Exporter PDF</button>
+  <button class="btn" onclick="clearSuccession()"><i class="ti ti-refresh" style="font-size:13px"></i> Fermer ce dossier</button>
+</div>
+</div><!-- /succession-zone -->
 
 <!-- MODAL NOUVEAU MANDAT -->
 <div class="modal-overlay" id="modal-nouveau-mandat">
@@ -4173,6 +4251,306 @@ document.addEventListener('DOMContentLoaded',function(){
     if(typeof firebase!=='undefined'&&firebase.auth){
       firebase.auth().onAuthStateChanged(function(user){
         if(user){chargerMandatsFirebase();}
+      });
+    }
+  },2000);
+});
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// INVENTAIRES SUCCESSORAUX (PRISÉE)
+// ═══════════════════════════════════════════════════════════
+
+let allSuccessions = {};
+let currentSuccessionId = null;
+let successionRows = [];
+let successionRowId = 0;
+
+function chargerSuccessionsFirebase(){
+  if(!fbdb)return;
+  fbdb.ref('inventairesSuccessoraux').on('value',function(snap){
+    allSuccessions = snap.val()||{};
+    renderListeInventairesSuccessoraux();
+  });
+}
+
+function sauverSuccessionFirebase(id){
+  if(!fbdb||!id)return;
+  fbdb.ref('inventairesSuccessoraux/'+id).set(allSuccessions[id]);
+}
+
+function supprimerSuccessionFirebase(id){
+  if(!fbdb||!id)return;
+  fbdb.ref('inventairesSuccessoraux/'+id).remove();
+}
+
+function genIdSuccession(){return 'succ_'+Date.now()+'_'+Math.random().toString(36).substr(2,6);}
+
+// ── LISTE ────────────────────────────────────────────────
+function toggleListeSuccessions(){
+  var el=document.getElementById('liste-successions');
+  var btn=document.getElementById('btn-toggle-successions');
+  if(el.style.display==='none'){
+    el.style.display='block';
+    btn.innerHTML='<i class="ti ti-chevron-up" style="font-size:13px"></i> Masquer';
+    renderListeInventairesSuccessoraux();
+  } else {
+    el.style.display='none';
+    btn.innerHTML='<i class="ti ti-list" style="font-size:13px"></i> Tous les inventaires successoraux';
+  }
+}
+
+function renderListeInventairesSuccessoraux(){
+  var el=document.getElementById('successions-contenu');
+  var ids=Object.keys(allSuccessions);
+  if(ids.length===0){el.innerHTML='<div class="empty-dossiers">Aucun inventaire successoral enregistré. Créez le premier !</div>';return;}
+  var parAnnee={};
+  ids.forEach(function(id){
+    var s=allSuccessions[id];
+    var annee=s.annee||'Non classé';
+    if(!parAnnee[annee])parAnnee[annee]=[];
+    parAnnee[annee].push(Object.assign({id:id},s));
+  });
+  var anneesSorted=Object.keys(parAnnee).sort(function(a,b){return b-a;});
+  anneesSorted.forEach(function(annee){
+    parAnnee[annee].sort(function(a,b){return (a.dateCreation||0)-(b.dateCreation||0);});
+  });
+  var html='';
+  anneesSorted.forEach(function(annee){
+    html+='<div class="annee-groupe"><div class="annee-label"><i class="ti ti-calendar"></i> '+annee+'</div><div class="dossier-grid">';
+    parAnnee[annee].forEach(function(s){
+      var isActive=s.id===currentSuccessionId;
+      var nbBiens=s.rows?s.rows.length:0;
+      var dateCreation=s.dateCreation?new Date(s.dateCreation).toLocaleDateString('fr-FR'):'';
+      html+='<div class="dossier-card'+(isActive?' active':'')+'" onclick="ouvrirSuccession(\''+s.id+'\')">';
+      html+='<button class="dc-del" onclick="event.stopPropagation();supprimerSuccession(\''+s.id+'\')" title="Supprimer"><i class="ti ti-trash"></i></button>';
+      html+='<div class="dc-nom" title="'+(s.nom||'')+'">'+(s.nom||'Sans nom')+'</div>';
+      html+='<div class="dc-info">'+nbBiens+' bien(s)</div>';
+      html+='<div class="dc-info" style="color:var(--text3)">'+dateCreation+'</div>';
+      if(isActive)html+='<div style="margin-top:4px;font-size:10px;color:var(--tc2);font-weight:600">✓ EN COURS</div>';
+      html+='</div>';
+    });
+    html+='</div></div>';
+  });
+  el.innerHTML=html;
+}
+
+// ── MODAL NOUVEAU ────────────────────────────────────────
+function ouvrirModalNouvelleSuccession(){
+  document.getElementById('new-succ-nom').value='';
+  document.getElementById('modal-nouvelle-succession').classList.add('active');
+  setTimeout(function(){document.getElementById('new-succ-nom').focus();},100);
+}
+function fermerModalNouvelleSuccession(){
+  document.getElementById('modal-nouvelle-succession').classList.remove('active');
+}
+document.getElementById('modal-nouvelle-succession').addEventListener('click',function(e){if(e.target===this)fermerModalNouvelleSuccession();});
+
+function creerNouvelleSuccession(){
+  var nom=document.getElementById('new-succ-nom').value.trim();
+  var annee=document.getElementById('new-succ-annee').value;
+  if(!nom){alert('Veuillez saisir un nom de dossier.');return;}
+  if(currentSuccessionId)sauverSuccessionEnCours();
+  var id=genIdSuccession();
+  allSuccessions[id]={id:id,nom:nom,annee:annee,dateCreation:Date.now(),rows:[]};
+  sauverSuccessionFirebase(id);
+  fermerModalNouvelleSuccession();
+  ouvrirSuccession(id);
+}
+
+function supprimerSuccession(id){
+  var s=allSuccessions[id];
+  if(!confirm('Supprimer définitivement l\'inventaire successoral "'+(s?s.nom||'Sans nom':'')+'" ?'))return;
+  delete allSuccessions[id];
+  supprimerSuccessionFirebase(id);
+  if(currentSuccessionId===id)clearSuccession();
+  else renderListeInventairesSuccessoraux();
+}
+
+// ── OUVERTURE / FERMETURE ────────────────────────────────
+function ouvrirSuccession(id){
+  if(currentSuccessionId)sauverSuccessionEnCours();
+  currentSuccessionId=id;
+  var s=allSuccessions[id];
+  if(!s)return;
+  document.getElementById('succ-nom').value=s.nom||'';
+  successionRows=[];successionRowId=0;
+  (s.rows||[]).forEach(function(r){
+    var newId=++successionRowId;
+    successionRows.push({id:newId,desig:r.desig||'',lieu:r.lieu||'',estimation:r.estimation||''});
+  });
+  renderLignesSuccession();
+  updateTotalSuccession();
+  var badge=document.getElementById('badge-succession-actif');
+  badge.textContent=s.nom;badge.style.display='inline';
+  document.getElementById('succession-zone').classList.add('visible');
+  document.getElementById('liste-successions').style.display='none';
+  document.getElementById('btn-toggle-successions').innerHTML='<i class="ti ti-list" style="font-size:13px"></i> Tous les inventaires successoraux';
+  window.scrollTo({top:0,behavior:'smooth'});
+  renderListeInventairesSuccessoraux();
+}
+
+function clearSuccession(){
+  if(currentSuccessionId)sauverSuccessionEnCours();
+  currentSuccessionId=null;
+  successionRows=[];successionRowId=0;
+  document.getElementById('badge-succession-actif').style.display='none';
+  document.getElementById('succession-zone').classList.remove('visible');
+  document.getElementById('succ-nom').value='';
+  renderLignesSuccession();
+  renderListeInventairesSuccessoraux();
+}
+
+// ── LIGNES ────────────────────────────────────────────────
+function ajouterLigneSuccession(){
+  var newId=++successionRowId;
+  successionRows.push({id:newId,desig:'',lieu:'',estimation:''});
+  renderLignesSuccession();
+  autosaveSuccession();
+}
+
+function supprimerLigneSuccession(id){
+  successionRows=successionRows.filter(function(r){return r.id!==id;});
+  renderLignesSuccession();
+  updateTotalSuccession();
+  autosaveSuccession();
+}
+
+function updateLigneSuccession(id,champ,valeur){
+  var r=successionRows.find(function(r){return r.id===id;});
+  if(r)r[champ]=valeur;
+  updateTotalSuccession();
+}
+
+function renderLignesSuccession(){
+  var tbody=document.getElementById('succession-body');
+  if(!tbody)return;
+  var html='';
+  successionRows.forEach(function(r,i){
+    html+='<tr>';
+    html+='<td style="text-align:center">'+(i+1)+'</td>';
+    html+='<td><textarea rows="1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';updateLigneSuccession('+r.id+',\'desig\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);resize:none;outline:none;padding:2px 3px">'+esc2(r.desig||'')+'</textarea></td>';
+    html+='<td><input type="text" value="'+esc2(r.lieu||'')+'" oninput="updateLigneSuccession('+r.id+',\'lieu\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);padding:2px 3px"/></td>';
+    html+='<td><input type="text" inputmode="decimal" value="'+esc2(r.estimation||'')+'" placeholder="0,00" oninput="updateLigneSuccession('+r.id+',\'estimation\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);text-align:right;padding:2px 3px"/></td>';
+    html+='<td style="text-align:center"><button onclick="supprimerLigneSuccession('+r.id+')" style="background:none;border:none;cursor:pointer;color:#c0392b;font-size:13px"><i class="ti ti-trash"></i></button></td>';
+    html+='</tr>';
+  });
+  tbody.innerHTML=html;
+}
+
+function updateTotalSuccession(){
+  var total=0;
+  successionRows.forEach(function(r){total+=parseVal(r.estimation)||0;});
+  var el=document.getElementById('succession-total');
+  if(el)el.textContent=total.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';
+}
+
+// ── SAUVEGARDE ────────────────────────────────────────────
+function sauverSuccessionEnCours(){
+  if(!currentSuccessionId)return;
+  var nom=document.getElementById('succ-nom').value.trim();
+  allSuccessions[currentSuccessionId]=Object.assign({},allSuccessions[currentSuccessionId],{
+    nom:nom,
+    rows:successionRows.map(function(r){return {id:r.id,desig:r.desig||'',lieu:r.lieu||'',estimation:r.estimation||''};}),
+    dateMaj:Date.now()
+  });
+  sauverSuccessionFirebase(currentSuccessionId);
+}
+
+var _successionAutosaveTimer=null;
+function autosaveSuccession(){
+  if(!currentSuccessionId)return;
+  if(_successionAutosaveTimer)clearTimeout(_successionAutosaveTimer);
+  _successionAutosaveTimer=setTimeout(function(){sauverSuccessionEnCours();},1200);
+}
+document.addEventListener('DOMContentLoaded',function(){
+  var zone=document.getElementById('succession-zone');
+  if(zone){
+    zone.addEventListener('input',autosaveSuccession);
+  }
+});
+
+// ── EXPORT PDF ────────────────────────────────────────────
+function fmtMontantSuccession(n){
+  return (parseFloat(n)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/[  ]/g,' ');
+}
+
+async function exportSuccessionPDF(){
+  if(!currentSuccessionId)return;
+  sauverSuccessionEnCours();
+  var s=allSuccessions[currentSuccessionId];
+  if(!s)return;
+
+  if(!window.jspdf){
+    await new Promise(function(resolve,reject){
+      var s1=document.createElement('script');
+      s1.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s1.onload=function(){var s2=document.createElement('script');s2.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js';s2.onload=resolve;s2.onerror=reject;document.head.appendChild(s2);};
+      s1.onerror=reject;document.head.appendChild(s1);
+    }).catch(function(){alert('Impossible de charger jsPDF.');});
+    if(!window.jspdf)return;
+  }
+
+  var jsPDF=window.jspdf.jsPDF;
+  var doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+  var W=210,MG=14,CW=W-MG*2;
+  var TC1=[122,46,26],TC4=[232,176,144],TC6=[250,243,238],WHITE=[255,255,255],BLACK=[26,8,4];
+
+  function sf(b,sz,c){doc.setFont('helvetica',b?'bold':'normal');doc.setFontSize(sz||10);var cl=c||BLACK;doc.setTextColor(cl[0],cl[1],cl[2]);}
+  function fill(c){doc.setFillColor(c[0],c[1],c[2]);}
+
+  var y=14;
+  fill(TC1);doc.rect(MG,y,CW,10,'F');
+  sf(true,14,WHITE);doc.text('PRISÉE',W/2,y+7,{align:'center'});
+  y+=16;
+
+  var lignes=(s.rows||[]).map(function(r,i){
+    return [String(i+1), r.desig||'', r.lieu||'', r.estimation?fmtMontantSuccession(parseVal(r.estimation))+' €':''];
+  });
+
+  doc.autoTable({
+    startY:y,
+    margin:{left:MG,right:MG},
+    tableWidth:CW,
+    head:[['N°','Désignation du bien','Emplacement','Estimation (€)']],
+    body:lignes,
+    styles:{fontSize:9,cellPadding:2.5,textColor:BLACK,lineColor:TC4,lineWidth:0.2,overflow:'linebreak',valign:'top'},
+    headStyles:{fillColor:TC1,textColor:WHITE,fontStyle:'bold',fontSize:9.5},
+    alternateRowStyles:{fillColor:TC6},
+    columnStyles:{
+      0:{cellWidth:14,halign:'center'},
+      1:{cellWidth:'auto'},
+      2:{cellWidth:35},
+      3:{cellWidth:32,halign:'right'}
+    }
+  });
+  y=doc.lastAutoTable.finalY+6;
+
+  var total=(s.rows||[]).reduce(function(sum,r){return sum+(parseVal(r.estimation)||0);},0);
+  if(y>270){doc.addPage();y=16;}
+  fill(TC1);doc.rect(MG,y,CW,9,'F');
+  sf(true,10,WHITE);
+  doc.text('TOTAL DE LA PRISÉE',MG+3,y+6);
+  doc.text(fmtMontantSuccession(total)+' €',MG+CW-3,y+6,{align:'right'});
+
+  var totalPages=doc.internal.getNumberOfPages();
+  for(var p=1;p<=totalPages;p++){
+    doc.setPage(p);
+    sf(false,7,[150,150,150]);
+    doc.text('Page '+p+' / '+totalPages,MG+CW,290,{align:'right'});
+  }
+
+  var nomFichier='Prisee_'+(s.nom||'succession').replace(/\s+/g,'_')+'.pdf';
+  doc.save(nomFichier);
+}
+
+// Initialiser après connexion Firebase
+document.addEventListener('DOMContentLoaded',function(){
+  setTimeout(function(){
+    if(typeof firebase!=='undefined'&&firebase.auth){
+      firebase.auth().onAuthStateChanged(function(user){
+        if(user){chargerSuccessionsFirebase();}
       });
     }
   },2000);
