@@ -642,6 +642,7 @@ function updateDriveStatus(){
         <th style="width:40px;text-align:center;background:var(--tc1);color:#fff;">N°</th>
         <th style="background:var(--tc1);color:#fff;">Désignation du bien</th>
         <th style="width:16%;background:var(--tc1);color:#fff;">Emplacement</th>
+        <th style="width:80px;text-align:center;background:var(--tc1);color:#fff;">Indivision</th>
         <th style="width:16%;text-align:right;background:var(--tc1);color:#fff;">Estimation (€)</th>
         <th style="width:30px;background:var(--tc1);"></th>
       </tr>
@@ -4378,7 +4379,7 @@ function ouvrirSuccession(id){
   successionRows=[];successionRowId=0;
   (s.rows||[]).forEach(function(r){
     var newId=++successionRowId;
-    successionRows.push({id:newId,desig:r.desig||'',lieu:r.lieu||'',estimation:r.estimation||''});
+    successionRows.push({id:newId,desig:r.desig||'',lieu:r.lieu||'',indivision:!!r.indivision,estimation:r.estimation||''});
   });
   renderLignesSuccession();
   updateTotalSuccession();
@@ -4405,7 +4406,7 @@ function clearSuccession(){
 // ── LIGNES ────────────────────────────────────────────────
 function ajouterLigneSuccession(){
   var newId=++successionRowId;
-  successionRows.push({id:newId,desig:'',lieu:'',estimation:''});
+  successionRows.push({id:newId,desig:'',lieu:'',indivision:false,estimation:''});
   renderLignesSuccession();
   autosaveSuccession();
 }
@@ -4430,13 +4431,21 @@ function renderLignesSuccession(){
   successionRows.forEach(function(r,i){
     html+='<tr>';
     html+='<td style="text-align:center">'+(i+1)+'</td>';
-    html+='<td><textarea rows="1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';updateLigneSuccession('+r.id+',\'desig\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);resize:none;outline:none;padding:2px 3px">'+esc2(r.desig||'')+'</textarea></td>';
+    html+='<td><textarea rows="1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';updateLigneSuccession('+r.id+',\'desig\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);resize:none;outline:none;padding:2px 3px;overflow:hidden">'+esc2(r.desig||'')+'</textarea></td>';
     html+='<td><input type="text" value="'+esc2(r.lieu||'')+'" oninput="updateLigneSuccession('+r.id+',\'lieu\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);padding:2px 3px"/></td>';
+    html+='<td style="text-align:center"><input type="checkbox" '+(r.indivision?'checked':'')+' onchange="updateLigneSuccession('+r.id+',\'indivision\',this.checked)" style="width:14px;height:14px;cursor:pointer"/></td>';
     html+='<td><input type="text" inputmode="decimal" value="'+esc2(r.estimation||'')+'" placeholder="0,00" oninput="updateLigneSuccession('+r.id+',\'estimation\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);text-align:right;padding:2px 3px"/></td>';
     html+='<td style="text-align:center"><button onclick="supprimerLigneSuccession('+r.id+')" style="background:none;border:none;cursor:pointer;color:#c0392b;font-size:13px"><i class="ti ti-trash"></i></button></td>';
     html+='</tr>';
   });
   tbody.innerHTML=html;
+  // Ajuster la hauteur des zones de texte multi-lignes dès l'affichage (pas seulement à la saisie)
+  requestAnimationFrame(function(){
+    tbody.querySelectorAll('textarea').forEach(function(ta){
+      ta.style.height='auto';
+      ta.style.height=ta.scrollHeight+'px';
+    });
+  });
 }
 
 function updateTotalSuccession(){
@@ -4452,7 +4461,7 @@ function sauverSuccessionEnCours(){
   var nom=document.getElementById('succ-nom').value.trim();
   allSuccessions[currentSuccessionId]=Object.assign({},allSuccessions[currentSuccessionId],{
     nom:nom,
-    rows:successionRows.map(function(r){return {id:r.id,desig:r.desig||'',lieu:r.lieu||'',estimation:r.estimation||''};}),
+    rows:successionRows.map(function(r){return {id:r.id,desig:r.desig||'',lieu:r.lieu||'',indivision:!!r.indivision,estimation:r.estimation||''};}),
     dateMaj:Date.now()
   });
   sauverSuccessionFirebase(currentSuccessionId);
@@ -4462,7 +4471,7 @@ var _successionAutosaveTimer=null;
 function autosaveSuccession(){
   if(!currentSuccessionId)return;
   if(_successionAutosaveTimer)clearTimeout(_successionAutosaveTimer);
-  _successionAutosaveTimer=setTimeout(function(){sauverSuccessionEnCours();},1200);
+  _successionAutosaveTimer=setTimeout(function(){sauverSuccessionEnCours();},350);
 }
 document.addEventListener('DOMContentLoaded',function(){
   var zone=document.getElementById('succession-zone');
@@ -4499,6 +4508,14 @@ async function exportSuccessionPDF(){
 
   function sf(b,sz,c){doc.setFont('helvetica',b?'bold':'normal');doc.setFontSize(sz||10);var cl=c||BLACK;doc.setTextColor(cl[0],cl[1],cl[2]);}
   function fill(c){doc.setFillColor(c[0],c[1],c[2]);}
+  function texteEstimation(raw){
+    if(raw==null||raw==='')return'';
+    var nettoye=String(raw).replace(/\s/g,'').replace(',','.');
+    if(/^-?\d*\.?\d*$/.test(nettoye)&&nettoye!==''){
+      return fmtMontantSuccession(parseFloat(nettoye)||0)+' €';
+    }
+    return String(raw); // texte libre (ex : "Mémoire")
+  }
 
   var y=14;
   fill(TC1);doc.rect(MG,y,CW,10,'F');
@@ -4506,14 +4523,14 @@ async function exportSuccessionPDF(){
   y+=16;
 
   var lignes=(s.rows||[]).map(function(r,i){
-    return [String(i+1), r.desig||'', r.lieu||'', r.estimation?fmtMontantSuccession(parseVal(r.estimation))+' €':''];
+    return [String(i+1), r.desig||'', r.lieu||'', r.indivision?'X':'', texteEstimation(r.estimation)];
   });
 
   doc.autoTable({
     startY:y,
     margin:{left:MG,right:MG},
     tableWidth:CW,
-    head:[['N°','Désignation du bien','Emplacement','Estimation (€)']],
+    head:[['N°','Désignation du bien','Emplacement','Indivision','Estimation (€)']],
     body:lignes,
     styles:{fontSize:9,cellPadding:2.5,textColor:BLACK,lineColor:TC4,lineWidth:0.2,overflow:'linebreak',valign:'top'},
     headStyles:{fillColor:TC1,textColor:WHITE,fontStyle:'bold',fontSize:9.5},
@@ -4521,18 +4538,23 @@ async function exportSuccessionPDF(){
     columnStyles:{
       0:{cellWidth:14,halign:'center'},
       1:{cellWidth:'auto'},
-      2:{cellWidth:35},
-      3:{cellWidth:32,halign:'right'}
+      2:{cellWidth:32},
+      3:{cellWidth:20,halign:'center'},
+      4:{cellWidth:30,halign:'right'}
     }
   });
   y=doc.lastAutoTable.finalY+6;
 
   var total=(s.rows||[]).reduce(function(sum,r){return sum+(parseVal(r.estimation)||0);},0);
-  if(y>270){doc.addPage();y=16;}
+  if(y>260){doc.addPage();y=16;}
   fill(TC1);doc.rect(MG,y,CW,9,'F');
   sf(true,10,WHITE);
   doc.text('TOTAL DE LA PRISÉE',MG+3,y+6);
   doc.text(fmtMontantSuccession(total)+' €',MG+CW-3,y+6,{align:'right'});
+  y+=13;
+  sf(false,8.5,BLACK);
+  var totalLettres=doc.splitTextToSize('Soit, en toutes lettres : '+montantEnLettres(total),CW);
+  doc.text(totalLettres,MG,y);
 
   var totalPages=doc.internal.getNumberOfPages();
   for(var p=1;p<=totalPages;p++){
