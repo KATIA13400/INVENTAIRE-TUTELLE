@@ -332,11 +332,23 @@ function fbEcouter() {
   });
   fbdb.ref('dossiers').on('child_removed', function(snap) {
     var id = snap.key;
-    if(allDossiers[id] && id !== currentDossierId) {
-      delete allDossiers[id];
-      try{sauverTousDossiers();}catch(e){}
-      renderListeDossiers();
+    if(!allDossiers[id]) return;
+    var etaitActif = (id === currentDossierId);
+    delete allDossiers[id];
+    try{sauverTousDossiers();}catch(e){}
+    if(etaitActif) {
+      // Ce dossier vient d'être supprimé depuis un autre onglet/appareil : on
+      // ferme la vue immédiatement pour que cet onglet ne le ressuscite pas
+      // dans Firebase à la prochaine sauvegarde automatique.
+      currentDossierId=null;
+      rows=[];rowId=0;photos=[];rowPhotos={};
+      document.getElementById('badge-dossier-actif').style.display='none';
+      document.getElementById('dossier-zone').classList.remove('visible');
+      document.getElementById('ordonnance-card').classList.remove('visible');
+      renderRows();renderGallery();
+      alert('Ce dossier a été supprimé depuis un autre onglet ou appareil.');
     }
+    renderListeDossiers();
   });
 }
 
