@@ -4289,7 +4289,19 @@ function sauverSuccessionsLocal(){
 function chargerSuccessionsFirebase(){
   if(!fbdb)return;
   fbdb.ref('inventairesSuccessoraux').on('value',function(snap){
-    allSuccessions = snap.val()||{};
+    var distant=snap.val()||{};
+    // Fusion additive : ne remplace jamais un dossier local par une version
+    // distante plus ancienne ou incomplète (protège contre une lecture
+    // Firebase temporairement vide/désynchronisée qui écraserait des
+    // données locales pas encore synchronisées)
+    Object.keys(distant).forEach(function(id){
+      var local=allSuccessions[id];
+      var dateDistant=distant[id].dateMaj||distant[id].dateCreation||0;
+      var dateLocal=local?(local.dateMaj||local.dateCreation||0):-1;
+      if(!local||dateDistant>=dateLocal){
+        allSuccessions[id]=distant[id];
+      }
+    });
     sauverSuccessionsLocal();
     renderListeInventairesSuccessoraux();
   },function(err){
@@ -4431,14 +4443,14 @@ function ajouterLigneSuccession(){
   var newId=++successionRowId;
   successionRows.push({id:newId,desig:'',lieu:'',indivision:false,estimation:''});
   renderLignesSuccession();
-  autosaveSuccession();
+  sauverSuccessionEnCours(); // sauvegarde immédiate (pas de débounce) pour une action discrète comme celle-ci
 }
 
 function supprimerLigneSuccession(id){
   successionRows=successionRows.filter(function(r){return r.id!==id;});
   renderLignesSuccession();
   updateTotalSuccession();
-  autosaveSuccession();
+  sauverSuccessionEnCours();
 }
 
 function updateLigneSuccession(id,champ,valeur){
@@ -4446,7 +4458,7 @@ function updateLigneSuccession(id,champ,valeur){
   if(!r)return;
   r[champ]=valeur;
   if(champ==='desig'){
-    var regex=/(\d+[,\.]\d+|\d+)\s*gr/i;
+    var regex=/(\d+(?:[,\.]\d+)?)\s*(?:gr|grs|grammes?|g)\b/i;
     var match=String(valeur||'').match(regex);
     if(match){
       var poids=parseFloat(match[1].replace(',','.'));
@@ -4518,6 +4530,12 @@ document.addEventListener('DOMContentLoaded',function(){
   }
 });
 
+// Sauvegarde immédiate avant fermeture/rechargement de la page, au cas où
+// le débounce de 350ms n'aurait pas eu le temps de se déclencher
+window.addEventListener('beforeunload', function(){
+  if(currentSuccessionId){ sauverSuccessionEnCours(); }
+});
+
 // ── EXPORT PDF ────────────────────────────────────────────
 function fmtMontantSuccession(n){
   return (parseFloat(n)||0).toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/[  ]/g,' ');
@@ -4552,7 +4570,12 @@ async function exportSuccessionPDF(){
     if(/^-?\d*\.?\d*$/.test(nettoye)&&nettoye!==''){
       return fmtMontantSuccession(parseFloat(nettoye)||0)+' €';
     }
-    return String(raw); // texte libre (ex : "Mémoire")
+    return nettoyerTexte(String(raw)); // texte libre (ex : "Mémoire")
+  }
+  function nettoyerTexte(t){
+    // Remplace les espaces spéciaux (insécables) par un espace normal : Helvetica
+    // ne les a pas et les affiche comme un "/", et ils cassent le retour à la ligne
+    return String(t||'').replace(/[\xa0  ⁠]/g,' ');
   }
 
   var y=14;
@@ -4561,7 +4584,7 @@ async function exportSuccessionPDF(){
   y+=16;
 
   var lignes=(s.rows||[]).map(function(r,i){
-    return [String(i+1), r.desig||'', r.lieu||'', r.indivision?'X':'', texteEstimation(r.estimation)];
+    return [String(i+1), nettoyerTexte(r.desig||''), nettoyerTexte(r.lieu||''), r.indivision?'X':'', texteEstimation(r.estimation)];
   });
 
   doc.autoTable({
