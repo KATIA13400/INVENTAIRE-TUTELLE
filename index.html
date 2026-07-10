@@ -1065,7 +1065,7 @@ function updateDriveStatus(){
   <button class="btn pdf-btn biens-only" onclick="exportPDF()"><i class="ti ti-file-type-pdf" style="font-size:13px"></i> Exporter PDF</button>
   <button class="btn biens-only" onclick="exportExcel()"><i class="ti ti-table" style="font-size:13px"></i> Exporter Excel</button>
   <button class="btn pdf-btn veh-only" style="display:none" onclick="exportEstimationVehiculePDF()"><i class="ti ti-file-type-pdf" style="font-size:13px"></i> Exporter PDF estimation véhicule</button>
-  <button class="btn" onclick="clearDossier()"><i class="ti ti-refresh" style="font-size:13px"></i> Nouveau dossier</button>
+  <button class="btn" onclick="clearDossier()"><i class="ti ti-refresh" style="font-size:13px"></i> Fermer ce dossier</button>
   <button class="btn primary biens-only" onclick="toggleMentionAbandon()" id="btn-abandon"><i class="ti ti-alert-triangle" style="font-size:13px"></i> Mention abandon</button>
   <button class="btn primary biens-only" onclick="toggleMentionBijoux()" id="btn-bijoux"><i class="ti ti-diamond" style="font-size:13px"></i> Mention bijoux</button>
   <span id="fb-status" style="font-size:11px;color:#2a6a3a;margin-right:8px">🔴 Hors ligne</span><button class="btn" onclick="firebase.auth().signOut()" title="Se déconnecter" style="font-size:11px;padding:3px 8px;margin-right:4px;background:var(--bg3);color:var(--text2);border:1px solid var(--border);">🔓 Déco.</button><button class="btn" onclick="annuler()" title="Annuler la dernière action (Ctrl+Z)"><i class="ti ti-arrow-back-up" style="font-size:13px"></i> Annuler</button>
@@ -1833,7 +1833,7 @@ function renderRows(){
 }
 
 function clearDossier(){
-  if(!confirm('Effacer le dossier en cours ?'))return;
+  if(currentDossierId)sauverDossierEnCours();
   rows=[];rowId=0;photos=[];rowPhotos={};
   currentDossierId=null;
   document.getElementById('badge-dossier-actif').style.display='none';
