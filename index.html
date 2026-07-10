@@ -199,6 +199,8 @@ td textarea{overflow:hidden;line-height:1.5;min-height:28px}
 <style>
 #dossier-zone{display:none}
 #dossier-zone.visible{display:block}
+#ordonnance-card{display:none}
+#ordonnance-card.visible{display:block}
 #succession-zone{display:none}
 #succession-zone.visible{display:block}
 </style>
@@ -839,7 +841,7 @@ function updateDriveStatus(){
 </div>
 
 <!-- ORDONNANCE -->
-<div class="card">
+<div class="card" id="ordonnance-card">
   <div class="section-label"><i class="ti ti-file-invoice" style="font-size:14px"></i>Import automatique par ordonnance</div>
   <div class="import-zone" id="drop-zone" onclick="document.getElementById('pdf-input').click()" ondragover="event.preventDefault();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handleOrdDrop(event)">
     <i class="ti ti-file-type-pdf" style="font-size:26px;color:var(--text2)"></i><br>
@@ -1845,6 +1847,7 @@ function clearDossier(){
   currentDossierId=null;
   document.getElementById('badge-dossier-actif').style.display='none';
   document.getElementById('dossier-zone').classList.remove('visible');
+  document.getElementById('ordonnance-card').classList.remove('visible');
   ['dos-num','dos-date','dos-heure','dos-personne','dos-adresse','dos-presence',
    'mand-nom','mand-org','mand-adresse','mand-tribunal','mand-jugement','mand-ville']
   .forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
@@ -2858,6 +2861,7 @@ function ouvrirDossier(id){
   
   // Afficher la zone dossier
   document.getElementById('dossier-zone').classList.add('visible');
+  document.getElementById('ordonnance-card').classList.add('visible');
 
   // Fermer la liste et scroller en haut
   document.getElementById('liste-dossiers').style.display='none';
@@ -2893,6 +2897,7 @@ function supprimerDossier(id){
     rows=[];rowId=0;photos=[];rowPhotos={};
     document.getElementById('badge-dossier-actif').style.display='none';
     document.getElementById('dossier-zone').classList.remove('visible');
+    document.getElementById('ordonnance-card').classList.remove('visible');
     // Vider le formulaire
     ['dos-num','dos-date','dos-heure','dos-personne','dos-adresse','dos-presence',
      'mand-nom','mand-org','mand-adresse','mand-tribunal','mand-jugement','mand-ville']
