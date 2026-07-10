@@ -4552,7 +4552,9 @@ async function exportSuccessionPDF(){
   var jsPDF=window.jspdf.jsPDF;
   var doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
   var W=210,MG=14,CW=W-MG*2;
-  var TC1=[122,46,26],TC4=[232,176,144],TC6=[250,243,238],WHITE=[255,255,255],BLACK=[26,8,4];
+  // Palette en dégradé de gris clair (au lieu du bordeaux) : plus économe et plus lisible
+  // à l'impression sur imprimante thermique chez les clients.
+  var TC1=[210,210,210],TC4=[225,225,225],TC6=[246,246,246],WHITE=[255,255,255],BLACK=[26,8,4];
 
   function sf(b,sz,c){doc.setFont('helvetica',b?'bold':'normal');doc.setFontSize(sz||10);var cl=c||BLACK;doc.setTextColor(cl[0],cl[1],cl[2]);}
   function fill(c){doc.setFillColor(c[0],c[1],c[2]);}
@@ -4572,7 +4574,7 @@ async function exportSuccessionPDF(){
 
   var y=14;
   fill(TC1);doc.rect(MG,y,CW,10,'F');
-  sf(true,14,WHITE);doc.text('PRISÉE',W/2,y+7,{align:'center'});
+  sf(true,14,BLACK);doc.text('PRISÉE',W/2,y+7,{align:'center'});
   y+=16;
 
   var lignes=(s.rows||[]).map(function(r,i){
@@ -4586,7 +4588,7 @@ async function exportSuccessionPDF(){
     head:[['N°','Désignation du bien','Emplacement','Indivision','Estimation (€)']],
     body:lignes,
     styles:{fontSize:9,cellPadding:2.5,textColor:BLACK,lineColor:TC4,lineWidth:0.2,overflow:'linebreak',valign:'top'},
-    headStyles:{fillColor:TC1,textColor:WHITE,fontStyle:'bold',fontSize:9.5},
+    headStyles:{fillColor:TC1,textColor:BLACK,fontStyle:'bold',fontSize:9.5},
     alternateRowStyles:{fillColor:TC6},
     columnStyles:{
       0:{cellWidth:14,halign:'center'},
@@ -4600,7 +4602,7 @@ async function exportSuccessionPDF(){
 
   var total=(s.rows||[]).reduce(function(sum,r){return sum+(parseVal(r.estimation)||0);},0);
   if(y>250){doc.addPage();y=16;}
-  sf(true,10,WHITE);
+  sf(true,10,BLACK);
   var rightW=38;
   var labelText='TOTAL DE LA PRISÉE ('+montantEnLettres(total)+')';
   var wLabel=doc.splitTextToSize(labelText,CW-rightW-6);
