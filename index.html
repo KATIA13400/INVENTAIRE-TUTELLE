@@ -278,6 +278,11 @@ function fbChargerTous(callback) {
   fbdb.ref('dossiers').once('value', function(snap) {
     var data = snap.val();
     if(data) {
+      // Un dossier présent en local (ex: onglet resté ouvert, ancienne synchro)
+      // mais absent de Firebase a été supprimé ailleurs : on ne le ressuscite pas.
+      Object.keys(allDossiers).forEach(function(id) {
+        if(!data[id]) delete allDossiers[id];
+      });
       Object.keys(data).forEach(function(id) {
         var d = data[id];
         if(d) {
@@ -285,6 +290,7 @@ function fbChargerTous(callback) {
           allDossiers[id] = d;
         }
       });
+      try{sauverTousDossiers();}catch(e){}
       console.log('Firebase: ' + Object.keys(data).length + ' dossiers chargés');
     }
     if(callback) callback();
@@ -321,6 +327,7 @@ function fbEcouter() {
     var id = snap.key;
     if(allDossiers[id] && id !== currentDossierId) {
       delete allDossiers[id];
+      try{sauverTousDossiers();}catch(e){}
       renderListeDossiers();
     }
   });
