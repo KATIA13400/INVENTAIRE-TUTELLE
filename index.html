@@ -80,9 +80,6 @@ body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(
 .exp-field label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.04em;font-weight:500}
 .exp-field input,.exp-field textarea{font-family:inherit;font-size:12px;border:1px solid var(--border);border-radius:var(--radius);padding:5px 8px;background:var(--bg2);color:var(--text);width:100%}
 .exp-field textarea{resize:vertical;min-height:50px}
-.exp-question{background:var(--tc5);border:1px solid var(--tc3);border-radius:var(--radius);padding:10px 12px;font-size:13px;color:var(--tc1)}
-.exp-question p{margin-bottom:6px;font-weight:600}
-.exp-question input{font-family:inherit;font-size:13px;border:1px solid var(--tc3);border-radius:var(--radius);padding:5px 8px;background:#fff;color:var(--text);width:100%;margin-top:4px}
 .exp-actions{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
 
 /* Table */
@@ -804,7 +801,7 @@ function updateDriveStatus(){
 </div>
 
 <div class="api-banner">
-  <strong><i class="ti ti-key"></i> Clé API Anthropic (expertise IA + import ordonnances)</strong>
+  <strong><i class="ti ti-key"></i> Clé API Anthropic (import ordonnances + carte grise véhicule)</strong>
   <input type="password" id="api-key" placeholder="sk-ant-api03-..." oninput="localStorage.setItem('fagiano_api_key',this.value)"/>
   <div style="margin-top:4px;font-size:11px;color:var(--text3)">Stockée localement sur votre ordinateur uniquement.</div>
 </div>
@@ -828,17 +825,12 @@ function updateDriveStatus(){
       <input type="file" id="exp-img-input" accept="image/*" multiple style="display:none" onchange="loadExpImages(this.files)"/>
       <div class="exp-thumbnails" id="exp-thumbnails"><div style="font-size:12px;color:var(--text3);font-style:italic;padding:4px 0">Aucune photo chargée</div></div>
       <div style="display:flex;gap:7px;flex-wrap:wrap;margin-top:6px">
-        <button class="btn terra" id="btn-expertiser" onclick="lancerExpertise()" disabled><i class="ti ti-search" style="font-size:13px"></i> Expertiser</button>
+        <a href="https://gemini.google.com/gem/a8eb9d2865cc" target="_blank" rel="noopener" class="btn terra" style="text-decoration:none"><i class="ti ti-external-link" style="font-size:13px"></i> Ouvrir mon Gem Expertise Instantanée</a>
         <button class="btn" onclick="clearExpertise()" style="font-size:11px"><i class="ti ti-x" style="font-size:12px"></i> Effacer</button>
       </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">Dépose tes photos dans la Gem, puis reviens coller la description et l'estimation ci-contre.</div>
     </div>
     <div class="exp-right">
-      <div id="exp-question-block" style="display:none" class="exp-question">
-        <p><i class="ti ti-help-circle"></i> L'IA a besoin de précisions :</p>
-        <div id="exp-question-text" style="margin-bottom:6px"></div>
-        <input type="text" id="exp-answer" placeholder="Votre réponse…" onkeydown="if(event.key==='Enter')repondreExpertise()"/>
-        <div style="margin-top:6px"><button class="btn terra" onclick="repondreExpertise()" style="font-size:12px"><i class="ti ti-send" style="font-size:12px"></i> Envoyer</button></div>
-      </div>
       <div id="exp-sbar" class="sbar hidden"><span id="exp-sbar-icon"></span>&nbsp;<span id="exp-sbar-txt"></span></div>
       <div class="exp-fields">
         <div class="exp-field" style="grid-column:1/-1"><label>Désignation du bien</label><textarea id="exp-desig" placeholder="L'IA rédigera la description ici…" rows="2"></textarea></div>
@@ -1143,7 +1135,7 @@ function updateDriveStatus(){
 <script>
 let rows=[], rowId=0, photos=[];
 let rowPhotos={};  // Photos indexées par ligne : {rowId: [{id,src,label}]}
-let expImages=[], expHistory=[];
+let expImages=[];
 let currentDossierId=null;  // ID du dossier en cours
 let allDossiers={};         // Tous les dossiers stockés
 let historique=[];          // Historique pour annuler (max 20 états)
@@ -1977,16 +1969,14 @@ function loadExpImages(files){
       const label=LABELS_DEFAUT[expImages.length]||'Vue '+(expImages.length+1);
       compressImage(e.target.result, 1200, 0.75, compressed=>{
         expImages.push({b64:compressed,label});
-        expHistory=[];renderExpThumbs();
-        document.getElementById('btn-expertiser').disabled=false;
+        renderExpThumbs();
         setExpStatus('hidden','');
-        document.getElementById('exp-question-block').style.display='none';
       });
     };
     reader.readAsDataURL(file);
   });
 }
-function removeExpImage(idx){expImages.splice(idx,1);expHistory=[];renderExpThumbs();if(expImages.length===0)document.getElementById('btn-expertiser').disabled=true;}
+function removeExpImage(idx){expImages.splice(idx,1);renderExpThumbs();}
 function updateExpLabel(idx,val){if(expImages[idx])expImages[idx].label=val;}
 function triggerExpInput(){document.getElementById("exp-img-input").click();}
 function renderExpThumbs(){
@@ -2015,39 +2005,7 @@ function setExpStatus(type,msg){
   document.getElementById('exp-sbar-txt').textContent=msg;
   document.getElementById('exp-sbar-icon').innerHTML=type==='loading'?'<i class="ti ti-loader-2" style="animation:spin 1s linear infinite;display:inline-block;font-size:14px"></i>':type==='ok'?'<i class="ti ti-circle-check" style="font-size:14px"></i>':'<i class="ti ti-alert-circle" style="font-size:14px"></i>';
 }
-async function lancerExpertise(reponseSupp){
-  if(expImages.length===0)return;
-  const apiKey=getApiKey();if(!apiKey){setExpStatus('err','Entrez votre clé API Anthropic en haut de la page.');return;}
-  setExpStatus('loading','Analyse de '+expImages.length+' photo'+(expImages.length>1?'s':'')+' en cours…');
-  document.getElementById('btn-expertiser').disabled=true;document.getElementById('exp-question-block').style.display='none';
-  const sys='Tu es un commissaire-priseur judiciaire expert. Réponds en JSON valide : {"statut":"estimation"|"question","designation":"description PV","estimation_basse":nombre|null,"estimation_haute":nombre|null,"question":"question courte|null"}';
-  const content2=[];expImages.forEach(img=>{content2.push({type:'text',text:'Vue : '+img.label});content2.push({type:'image',source:{type:'base64',media_type:'image/jpeg',data:img.b64.split(',')[1]}});});
-  content2.push({type:'text',text:expImages.length>1?'Ces '+expImages.length+' photos montrent le même objet.':'Analyse pour inventaire judiciaire.'});
-  const messages=[{role:'user',content:content2}];
-  expHistory.forEach(h=>{messages.push({role:'assistant',content:h.a});messages.push({role:'user',content:h.u});});
-  if(reponseSupp)messages.push({role:'user',content:reponseSupp});
-  try{
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:1000,system:sys,messages})});
-    const data=await resp.json();if(data.error)throw new Error(data.error.message);
-    const txt=data.content.map(c=>c.text||'').join('');
-    const parsed=JSON.parse(txt.replace(/```json|```/g,'').trim());
-    if(parsed.statut==='question'){
-      document.getElementById('exp-question-block').style.display='block';
-      document.getElementById('exp-question-text').textContent=parsed.question||'Précisions ?';
-      document.getElementById('exp-answer').value='';document.getElementById('exp-answer').focus();
-      expHistory.push({a:txt,u:''});setExpStatus('hidden','');
-    }else{
-      document.getElementById('exp-question-block').style.display='none';
-      if(parsed.designation)document.getElementById('exp-desig').value=parsed.designation;
-      if(parsed.estimation_basse!=null)document.getElementById('exp-bas').value=parsed.estimation_basse;
-      if(parsed.estimation_haute!=null)document.getElementById('exp-haut').value=parsed.estimation_haute;
-      setExpStatus('ok','Expertise réalisée — injectez dans le tableau.');
-    }
-  }catch(err){setExpStatus('err','Erreur : '+err.message);}
-  document.getElementById('btn-expertiser').disabled=false;
-}
-function repondreExpertise(){const ans=document.getElementById('exp-answer').value.trim();if(!ans)return;if(expHistory.length>0)expHistory[expHistory.length-1].u=ans;lancerExpertise(ans);}
-function clearExpertise(){expImages=[];expHistory=[];document.getElementById('exp-img-input').value='';document.getElementById('btn-expertiser').disabled=true;document.getElementById('exp-question-block').style.display='none';['exp-desig','exp-bas','exp-haut'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});setExpStatus('hidden','');renderExpThumbs();}
+function clearExpertise(){expImages=[];document.getElementById('exp-img-input').value='';['exp-desig','exp-bas','exp-haut'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});setExpStatus('hidden','');renderExpThumbs();}
 function injecterDansLigne(){
   const sel=document.getElementById('exp-target-line').value;
   if(!sel){alert('Sélectionnez une ligne.');return;}
