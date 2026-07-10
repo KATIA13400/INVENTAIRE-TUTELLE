@@ -280,7 +280,7 @@ function fbChargerTous(callback) {
     if(data) {
       Object.keys(data).forEach(function(id) {
         var d = data[id];
-        if(d && id !== 'dos_cheylan_2026') {
+        if(d) {
           // Fusionner avec localStorage (Firebase prioritaire)
           allDossiers[id] = d;
         }
@@ -1614,10 +1614,15 @@ function detecterGrammesEtCalculer(desig, bas, haut){
     if(!isNaN(poids) && poids > 0){
       const calcBas = Math.round(poids * prixOrBas);
       const calcHaut = Math.round(poids * prixOrHaut);
-      return {bas: String(calcBas), haut: String(calcHaut)};
+      return {bas: String(calcBas), haut: String(calcHaut), poids: poids};
     }
   }
   return null;
+}
+
+function badgeOrHtml(calc){
+  if(!calc)return '';
+  return '🟡 Or : '+calc.poids.toLocaleString('fr-FR')+' g → '+calc.bas+'–'+calc.haut+' €';
 }
 
 function toggleMentionBijoux(){
@@ -1688,16 +1693,23 @@ function updateRow(id,field,value){
     r[field]=value;
     if(field==='desig'&&!r.memo){
       const calc=detecterGrammesEtCalculer(value);
+      const tbody=document.getElementById('inv-body');
+      const trs=[...tbody.querySelectorAll('tr')];
+      const idx=rows.findIndex(x=>x.id===id);
       if(calc){
         r.bas=calc.bas;r.haut=calc.haut;
-        const tbody=document.getElementById('inv-body');
-        const trs=[...tbody.querySelectorAll('tr')];
-        const idx=rows.findIndex(x=>x.id===id);
         if(idx>=0&&trs[idx]){
           const ib=trs[idx].querySelector('input[data-f="bas"]');
           const ih=trs[idx].querySelector('input[data-f="haut"]');
           if(ib)ib.value=calc.bas;
           if(ih)ih.value=calc.haut;
+        }
+      }
+      if(idx>=0&&trs[idx]){
+        const badgeEl=trs[idx].querySelector('.or-badge');
+        if(badgeEl){
+          badgeEl.style.display=calc?'':'none';
+          badgeEl.textContent=badgeOrHtml(calc);
         }
       }
     }
@@ -1763,7 +1775,8 @@ function renderRows(){
     var chk=r.memo?'checked':'';
     var html='';
     html+='<td class="num">'+(i+1)+'</td>';
-    html+='<td style="vertical-align:top;padding-top:4px"><div style="display:flex;align-items:flex-start;gap:3px"><textarea data-f="desig" data-id="'+r.id+'" placeholder="Description…" style="flex:1;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);resize:none;overflow:hidden;line-height:1.5;padding:2px 3px;border-radius:4px;outline:none;min-height:26px;display:block">'+esc(r.desig)+'</textarea><button class="btn-mic" data-id="'+r.id+'" onclick="toggleDictaphone(this,'+r.id+')" title="Dicter" style="flex-shrink:0;margin-top:2px;background:none;border:1px solid var(--border);border-radius:6px;padding:3px 5px;cursor:pointer;color:var(--text3);font-size:13px;line-height:1"><i class=\"ti ti-microphone\"></i></button></div></td>';
+    var calcOr=r.memo?null:detecterGrammesEtCalculer(r.desig||'');
+    html+='<td style="vertical-align:top;padding-top:4px"><div style="display:flex;align-items:flex-start;gap:3px"><textarea data-f="desig" data-id="'+r.id+'" placeholder="Description…" style="flex:1;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);resize:none;overflow:hidden;line-height:1.5;padding:2px 3px;border-radius:4px;outline:none;min-height:26px;display:block">'+esc(r.desig)+'</textarea><button class="btn-mic" data-id="'+r.id+'" onclick="toggleDictaphone(this,'+r.id+')" title="Dicter" style="flex-shrink:0;margin-top:2px;background:none;border:1px solid var(--border);border-radius:6px;padding:3px 5px;cursor:pointer;color:var(--text3);font-size:13px;line-height:1"><i class=\"ti ti-microphone\"></i></button></div><div class="or-badge" style="'+(calcOr?'':'display:none;')+'font-size:10px;margin-top:2px;padding:1px 6px;border-radius:8px;background:#fdf3d0;color:#8a6d1d;border:1px solid #e8cf7a;width:fit-content">'+badgeOrHtml(calcOr)+'</div></td>';
     html+='<td><input list="pieces-list" data-f="lieu" data-id="'+r.id+'" value="'+esc(r.lieu||'')+'" placeholder="Pièce…" style="font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);width:100%;padding:2px 3px;border-radius:4px;outline:none;"/></td>';
     html+='<td><input type="text" inputmode="decimal" class="r" data-f="bas" data-id="'+r.id+'" value="'+(r.bas||'')+'" placeholder="0" '+dis+' oninput="updateTotals()" style="font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);width:100%;padding:2px 3px;border-radius:4px;outline:none;text-align:right;"/></td>';
     html+='<td><input type="text" inputmode="decimal" class="r" data-f="haut" data-id="'+r.id+'" value="'+(r.haut||'')+'" placeholder="0" '+dis+' oninput="updateTotals()" style="font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);width:100%;padding:2px 3px;border-radius:4px;outline:none;text-align:right;"/></td>';
@@ -2791,16 +2804,7 @@ function ouvrirDossier(id){
   photos=[];rowPhotos={};
 
   // Construire la liste des rows à charger
-  var rowsToLoad;
-  if(id==='dos_cheylan_2026'){
-    // Cheylan : toujours depuis DATA_CHEYLAN (source de vérité)
-    // + eventuellement les modifs sauvegardées dans d.rows
-    rowsToLoad = (d.rows && d.rows.length>0)
-      ? d.rows
-      : DATA_CHEYLAN.map(function(d2,i){return{id:i+1,desig:d2.desig||'',lieu:d2.lieu||'',bas:d2.bas||'',haut:d2.haut||'',memo:d2.memo||false};});
-  } else {
-    rowsToLoad = d.rows||[];
-  }
+  var rowsToLoad = d.rows||[];
 
   // Charger toutes les lignes d\'un coup sans renderRows intermédiaire
   rowsToLoad.forEach(function(r){
@@ -2876,6 +2880,7 @@ function supprimerDossier(id){
   const d=allDossiers[id];
   if(!confirm('Supprimer définitivement le dossier "'+( d?.nom||'Sans nom')+'" ?'))return;
   delete allDossiers[id];
+  fbSupprimer(id);
   if(currentDossierId===id){
     currentDossierId=null;
     rows=[];rowId=0;photos=[];rowPhotos={};
@@ -2958,44 +2963,6 @@ const savedKey=localStorage.getItem('fagiano_api_key');if(savedKey)document.getE
 chargerTousDossiers();
 // ── Charger Firebase puis afficher la liste ───────────────────────────────
 fbChargerTous(function() {
-  // Initialiser Cheylan si absent (après chargement Firebase)
-  if(!allDossiers['dos_cheylan_2026']){
-    allDossiers['dos_cheylan_2026']={
-      id:'dos_cheylan_2026',
-      nom:'MARROT Veuve CHEYLAN Nicole 2026',
-      annee:'2026',
-      type:'SAUVEGARDE DE JUSTICE',
-      dateCreation:1747526400000,
-      h:{
-        dosType:'SAUVEGARDE DE JUSTICE',
-        dosNum:'IT26033',
-        dosDate:'2026-05-18',
-        dosHeure:'',
-        dosPersonne:'Madame Nicole MARROT Veuve CHEYLAN',
-        dosAdresse:'LE BOCAGE, 36 Bd Jean Jacques Rousseau, 13821 LA PENNE SUR HUVEAUNE',
-        mandNom:'Madame Julie BRARD VEDEL',
-        mandOrg:'Mandataire Judiciaire à la Protection des Majeurs',
-        mandAdresse:'BP 101, 13701 LA CIOTAT',
-        mandTribunal:"Tribunal de Proximité d'AUBAGNE",
-        mandJugement:'2026-04-07',
-        mandVille:'AUBAGNE'
-      },
-      rows:DATA_CHEYLAN.map(function(d,i){return{id:i+1,desig:d.desig||'',lieu:d.lieu||'',bas:d.bas||'',haut:d.haut||'',memo:d.memo||false};}),
-      dateMaj:Date.now()
-    };
-    // Sauver dans Firebase et localStorage
-    fbSauver('dos_cheylan_2026', allDossiers['dos_cheylan_2026']);
-    try{sauverTousDossiers();}catch(e){}
-    console.log('Cheylan IT26033 initialisé et sauvé dans Firebase');
-  } else if(!allDossiers['dos_cheylan_2026'].h.dosNum){
-    allDossiers['dos_cheylan_2026'].h.dosNum='IT26033';
-    fbSauver('dos_cheylan_2026', allDossiers['dos_cheylan_2026']);
-    try{sauverTousDossiers();}catch(e){}
-  } else if(!allDossiers['dos_cheylan_2026'].rows || allDossiers['dos_cheylan_2026'].rows.length===0){
-    allDossiers['dos_cheylan_2026'].rows=DATA_CHEYLAN.map(function(d,i){return{id:i+1,desig:d.desig||'',lieu:d.lieu||'',bas:d.bas||'',haut:d.haut||'',memo:d.memo||false};});
-    fbSauver('dos_cheylan_2026', allDossiers['dos_cheylan_2026']);
-    try{sauverTousDossiers();}catch(e){}
-  }
   renderRows();
   updateTotals();
   document.getElementById('liste-dossiers').style.display='block';
@@ -4453,21 +4420,33 @@ function supprimerLigneSuccession(id){
   sauverSuccessionEnCours();
 }
 
+function detecterGrammesOrSuccession(desig){
+  var regex=/(\d+(?:[,\.]\d+)?)\s*(?:gr|grs|grammes?|g)\b/i;
+  var match=String(desig||'').match(regex);
+  if(match){
+    var poids=parseFloat(match[1].replace(',','.'));
+    if(!isNaN(poids)&&poids>0){
+      return {poids:poids, estimation:String(Math.round(poids*prixOrHaut))};
+    }
+  }
+  return null;
+}
+
 function updateLigneSuccession(id,champ,valeur){
   var r=successionRows.find(function(r){return r.id===id;});
   if(!r)return;
   r[champ]=valeur;
   if(champ==='desig'){
-    var regex=/(\d+(?:[,\.]\d+)?)\s*(?:gr|grs|grammes?|g)\b/i;
-    var match=String(valeur||'').match(regex);
-    if(match){
-      var poids=parseFloat(match[1].replace(',','.'));
-      if(!isNaN(poids)&&poids>0){
-        var prixMoyen=(prixOrBas+prixOrHaut)/2;
-        r.estimation=String(Math.round(poids*prixMoyen));
-        var input=document.querySelector('#succession-body tr[data-row-id="'+id+'"] input[data-f="estimation"]');
-        if(input)input.value=r.estimation;
-      }
+    var calc=detecterGrammesOrSuccession(valeur);
+    if(calc){
+      r.estimation=calc.estimation;
+      var input=document.querySelector('#succession-body tr[data-row-id="'+id+'"] input[data-f="estimation"]');
+      if(input)input.value=r.estimation;
+    }
+    var badgeEl=document.querySelector('#succession-body tr[data-row-id="'+id+'"] .or-badge');
+    if(badgeEl){
+      badgeEl.style.display=calc?'':'none';
+      badgeEl.textContent=calc?('🟡 Or : '+calc.poids.toLocaleString('fr-FR')+' g → '+calc.estimation+' €'):'';
     }
   }
   updateTotalSuccession();
@@ -4480,7 +4459,8 @@ function renderLignesSuccession(){
   successionRows.forEach(function(r,i){
     html+='<tr data-row-id="'+r.id+'">';
     html+='<td style="text-align:center">'+(i+1)+'</td>';
-    html+='<td><textarea rows="1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';updateLigneSuccession('+r.id+',\'desig\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);resize:none;outline:none;padding:2px 3px;overflow:hidden">'+esc2(r.desig||'')+'</textarea></td>';
+    var calcOr=detecterGrammesOrSuccession(r.desig||'');
+    html+='<td><textarea rows="1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';updateLigneSuccession('+r.id+',\'desig\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);resize:none;outline:none;padding:2px 3px;overflow:hidden">'+esc2(r.desig||'')+'</textarea><div class="or-badge" style="'+(calcOr?'':'display:none;')+'font-size:10px;margin-top:2px;padding:1px 6px;border-radius:8px;background:#fdf3d0;color:#8a6d1d;border:1px solid #e8cf7a;width:fit-content">'+(calcOr?('🟡 Or : '+calcOr.poids.toLocaleString('fr-FR')+' g → '+calcOr.estimation+' €'):'')+'</div></td>';
     html+='<td><input type="text" value="'+esc2(r.lieu||'')+'" oninput="updateLigneSuccession('+r.id+',\'lieu\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);padding:2px 3px"/></td>';
     html+='<td style="text-align:center"><input type="checkbox" '+(r.indivision?'checked':'')+' onchange="updateLigneSuccession('+r.id+',\'indivision\',this.checked)" style="width:14px;height:14px;cursor:pointer"/></td>';
     html+='<td><input type="text" inputmode="decimal" data-f="estimation" value="'+esc2(r.estimation||'')+'" placeholder="0,00" oninput="updateLigneSuccession('+r.id+',\'estimation\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);text-align:right;padding:2px 3px"/></td>';
