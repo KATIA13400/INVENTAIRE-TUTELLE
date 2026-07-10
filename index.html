@@ -633,6 +633,10 @@ function updateDriveStatus(){
   <div class="grid3">
     <div class="fg"><label>Nom du dossier</label><input id="succ-nom"/></div>
   </div>
+  <div style="font-size:11px;color:var(--text2);background:var(--tc6);border-radius:var(--radius);padding:8px 10px;margin-top:10px">
+    <i class="ti ti-info-circle"></i>
+    Dès qu'une désignation contient un poids (ex : <strong>34,6 gr</strong>), l'estimation est calculée automatiquement (prix de l'or moyen configuré dans les inventaires de tutelle). Vous pouvez l'ajuster manuellement ensuite.
+  </div>
 </div>
 
 <div class="table-wrap">
@@ -4267,12 +4271,29 @@ let allSuccessions = {};
 let currentSuccessionId = null;
 let successionRows = [];
 let successionRowId = 0;
+chargerSuccessionsLocal();
+document.addEventListener('DOMContentLoaded',function(){renderListeInventairesSuccessoraux();});
+
+function chargerSuccessionsLocal(){
+  try{
+    var raw=localStorage.getItem('appli_inventaire_successions');
+    allSuccessions=raw?JSON.parse(raw):{};
+  }catch(e){allSuccessions={};}
+}
+
+function sauverSuccessionsLocal(){
+  try{localStorage.setItem('appli_inventaire_successions',JSON.stringify(allSuccessions));}
+  catch(e){console.warn('Erreur de sauvegarde locale (succession):',e);}
+}
 
 function chargerSuccessionsFirebase(){
   if(!fbdb)return;
   fbdb.ref('inventairesSuccessoraux').on('value',function(snap){
     allSuccessions = snap.val()||{};
+    sauverSuccessionsLocal();
     renderListeInventairesSuccessoraux();
+  },function(err){
+    console.warn('Firebase (successions) inaccessible, on garde la copie locale :',err);
   });
 }
 
@@ -4355,6 +4376,7 @@ function creerNouvelleSuccession(){
   if(currentSuccessionId)sauverSuccessionEnCours();
   var id=genIdSuccession();
   allSuccessions[id]={id:id,nom:nom,annee:annee,dateCreation:Date.now(),rows:[]};
+  sauverSuccessionsLocal();
   sauverSuccessionFirebase(id);
   fermerModalNouvelleSuccession();
   ouvrirSuccession(id);
@@ -4364,6 +4386,7 @@ function supprimerSuccession(id){
   var s=allSuccessions[id];
   if(!confirm('Supprimer définitivement l\'inventaire successoral "'+(s?s.nom||'Sans nom':'')+'" ?'))return;
   delete allSuccessions[id];
+  sauverSuccessionsLocal();
   supprimerSuccessionFirebase(id);
   if(currentSuccessionId===id)clearSuccession();
   else renderListeInventairesSuccessoraux();
@@ -4420,7 +4443,21 @@ function supprimerLigneSuccession(id){
 
 function updateLigneSuccession(id,champ,valeur){
   var r=successionRows.find(function(r){return r.id===id;});
-  if(r)r[champ]=valeur;
+  if(!r)return;
+  r[champ]=valeur;
+  if(champ==='desig'){
+    var regex=/(\d+[,\.]\d+|\d+)\s*gr/i;
+    var match=String(valeur||'').match(regex);
+    if(match){
+      var poids=parseFloat(match[1].replace(',','.'));
+      if(!isNaN(poids)&&poids>0){
+        var prixMoyen=(prixOrBas+prixOrHaut)/2;
+        r.estimation=String(Math.round(poids*prixMoyen));
+        var input=document.querySelector('#succession-body tr[data-row-id="'+id+'"] input[data-f="estimation"]');
+        if(input)input.value=r.estimation;
+      }
+    }
+  }
   updateTotalSuccession();
 }
 
@@ -4429,12 +4466,12 @@ function renderLignesSuccession(){
   if(!tbody)return;
   var html='';
   successionRows.forEach(function(r,i){
-    html+='<tr>';
+    html+='<tr data-row-id="'+r.id+'">';
     html+='<td style="text-align:center">'+(i+1)+'</td>';
     html+='<td><textarea rows="1" oninput="this.style.height=\'auto\';this.style.height=this.scrollHeight+\'px\';updateLigneSuccession('+r.id+',\'desig\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);resize:none;outline:none;padding:2px 3px;overflow:hidden">'+esc2(r.desig||'')+'</textarea></td>';
     html+='<td><input type="text" value="'+esc2(r.lieu||'')+'" oninput="updateLigneSuccession('+r.id+',\'lieu\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);padding:2px 3px"/></td>';
     html+='<td style="text-align:center"><input type="checkbox" '+(r.indivision?'checked':'')+' onchange="updateLigneSuccession('+r.id+',\'indivision\',this.checked)" style="width:14px;height:14px;cursor:pointer"/></td>';
-    html+='<td><input type="text" inputmode="decimal" value="'+esc2(r.estimation||'')+'" placeholder="0,00" oninput="updateLigneSuccession('+r.id+',\'estimation\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);text-align:right;padding:2px 3px"/></td>';
+    html+='<td><input type="text" inputmode="decimal" data-f="estimation" value="'+esc2(r.estimation||'')+'" placeholder="0,00" oninput="updateLigneSuccession('+r.id+',\'estimation\',this.value)" style="width:100%;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);text-align:right;padding:2px 3px"/></td>';
     html+='<td style="text-align:center"><button onclick="supprimerLigneSuccession('+r.id+')" style="background:none;border:none;cursor:pointer;color:#c0392b;font-size:13px"><i class="ti ti-trash"></i></button></td>';
     html+='</tr>';
   });
@@ -4464,6 +4501,7 @@ function sauverSuccessionEnCours(){
     rows:successionRows.map(function(r){return {id:r.id,desig:r.desig||'',lieu:r.lieu||'',indivision:!!r.indivision,estimation:r.estimation||''};}),
     dateMaj:Date.now()
   });
+  sauverSuccessionsLocal();
   sauverSuccessionFirebase(currentSuccessionId);
 }
 
@@ -4538,23 +4576,24 @@ async function exportSuccessionPDF(){
     columnStyles:{
       0:{cellWidth:14,halign:'center'},
       1:{cellWidth:'auto'},
-      2:{cellWidth:32},
-      3:{cellWidth:20,halign:'center'},
+      2:{cellWidth:30},
+      3:{cellWidth:26,halign:'center'},
       4:{cellWidth:30,halign:'right'}
     }
   });
   y=doc.lastAutoTable.finalY+6;
 
   var total=(s.rows||[]).reduce(function(sum,r){return sum+(parseVal(r.estimation)||0);},0);
-  if(y>260){doc.addPage();y=16;}
-  fill(TC1);doc.rect(MG,y,CW,9,'F');
+  if(y>250){doc.addPage();y=16;}
   sf(true,10,WHITE);
-  doc.text('TOTAL DE LA PRISÉE',MG+3,y+6);
-  doc.text(fmtMontantSuccession(total)+' €',MG+CW-3,y+6,{align:'right'});
-  y+=13;
-  sf(false,8.5,BLACK);
-  var totalLettres=doc.splitTextToSize('Soit, en toutes lettres : '+montantEnLettres(total),CW);
-  doc.text(totalLettres,MG,y);
+  var rightW=38;
+  var labelText='TOTAL DE LA PRISÉE ('+montantEnLettres(total)+')';
+  var wLabel=doc.splitTextToSize(labelText,CW-rightW-6);
+  var barH=Math.max(9,wLabel.length*5+4);
+  fill(TC1);doc.rect(MG,y,CW,barH,'F');
+  var startYGauche=y+barH/2-((wLabel.length-1)*5)/2+2;
+  doc.text(wLabel,MG+3,startYGauche);
+  doc.text(fmtMontantSuccession(total)+' €',MG+CW-3,y+barH/2+2,{align:'right'});
 
   var totalPages=doc.internal.getNumberOfPages();
   for(var p=1;p<=totalPages;p++){
