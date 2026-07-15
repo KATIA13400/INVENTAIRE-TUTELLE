@@ -1939,14 +1939,16 @@ function handlePhotoFiles(files){
     reader.onload=ev=>{
       // Compresser à max 800px et qualité 0.6 pour économiser l'espace
       compressImage(ev.target.result, 600, 0.5, compressed=>{
-        photos.push({id:Date.now()+"_"+Math.floor(Math.random()*100000),src:compressed,lineNum:0});
+        var photoId=Date.now()+"_"+Math.floor(Math.random()*100000);
+        photos.push({id:photoId,src:compressed,lineNum:0});
         renderGallery();
+        if(currentDossierId)fbSauverPhoto(currentDossierId,0,photoId,compressed,'');
       });
     };
     reader.readAsDataURL(file);
   });
 }
-function removePhoto(id){photos=photos.filter(p=>p.id!==id);renderGallery();}
+function removePhoto(id){photos=photos.filter(p=>p.id!==id);renderGallery();if(currentDossierId)fbSupprimerPhoto(currentDossierId,0,id);}
 function setPhotoLine(id,val){const p=photos.find(p=>p.id===id);if(p)p.lineNum=parseInt(val)||0;}
 function renderGallery(){
   var el=document.getElementById('photo-gallery');
@@ -2876,7 +2878,10 @@ function ouvrirDossier(id){
   renderGallery();
   // Charger les photos depuis Drive/cache IDB
   fbChargerPhotos(id, function(loaded){
+    var generales = loaded['0']||[];
+    delete loaded['0'];
     rowPhotos = loaded;
+    photos = generales.map(function(p){return {id:p.id, src:p.src, lineNum:0};});
     renderRows();
     syncRowPhotosToGallery();
   });
