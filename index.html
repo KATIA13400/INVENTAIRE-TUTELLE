@@ -2753,6 +2753,24 @@ async function exportEstimationVehiculePDF(){
   try{doc.addImage(SIG_B64,'JPEG',MG-2,y,58,44,'sig','FAST');}catch(e){console.warn('Sig:',e);}
   y+=54;
 
+  // ── ANNEXE PHOTOS ────────────────────────────────────────────────────────
+  var ptsVeh=photos.filter(function(p){return p.src;});
+  if(ptsVeh.length>0){
+    doc.addPage();var py=16;
+    fill(TC1);doc.rect(MG,py,CW,9,'F');
+    sf(true,12,WHITE);doc.text('ANNEXE PHOTOGRAPHIQUE',W/2,py+6,{align:'center'});py+=13;
+    var iW=(CW-8)/2,iH=65,cH=8,bH=iH+cH+4,col=0;
+    ptsVeh.forEach(function(p,i){
+      if(py+bH>280){doc.addPage();py=16;}
+      var x=MG+(col*(iW+8));
+      drw(TC4);fill(WHITE);doc.rect(x,py,iW,iH+cH+2,'FD');
+      try{doc.addImage(p.src,'JPEG',x+1,py+1,iW-2,iH,'','FAST');}catch(e){}
+      fill(TC5);doc.rect(x,py+iH+1,iW,cH,'F');
+      sf(true,8,TC1);doc.text('Photo '+(i+1),x+iW/2,py+iH+1+cH/2+1.5,{align:'center'});
+      col++;if(col===2){col=0;py+=bH+6;}
+    });
+  }
+
   // ── MENTION RGPD (tout à la fin, après la signature et le tampon) ──
   if(y>262){doc.addPage();y=16;}
   sf(false,7,TC2);
