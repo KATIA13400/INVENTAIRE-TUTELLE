@@ -2729,9 +2729,13 @@ async function exportEstimationVehiculePDF(){
   doc.text(wEstLettres,MG+2,startYGauche);
   sf(true,13,TC1);doc.text(fmtEstimation(veh.estimation)+' €',MG+CW-3,y+recapH/2+2,{align:'right'});
   y+=recapH+4;
-  sf(false,7.5,BLACK);
-  var wReserve=doc.splitTextToSize("Sous réserve qu'il n'y ait pas de problèmes mécaniques majeurs au contrôle technique et expertise à venir. Durée de validité de cette estimation : 3 mois.",CW);
-  doc.text(wReserve,MG,y);y+=wReserve.length*4+8;
+  if(y>230){doc.addPage();y=16;}
+  sf(true,8.5,BLACK);
+  var wReserve=doc.splitTextToSize("Sous réserve qu'il n'y ait pas de problèmes mécaniques majeurs au contrôle technique et expertise à venir. Durée de validité de cette estimation : 3 mois.",CW-14);
+  var reserveH=wReserve.length*5+16;
+  fill(TC5);drw(TC4);lw(0.3);doc.rect(MG,y,CW,reserveH,'FD');
+  doc.text(wReserve,MG+7,y+10);
+  y+=reserveH+8;
 
   if(veh.mentionVente){
     if(y>230){doc.addPage();y=16;}
@@ -2743,6 +2747,12 @@ async function exportEstimationVehiculePDF(){
     doc.text(wVente,MG+7,y+10);
     y+=venteH+8;
   }
+
+  // ── MENTION RGPD (juste au-dessus du lieu et de la date, position fixe) ──
+  if(y>250){doc.addPage();y=16;}
+  sf(false,7,TC2);
+  var wRgpd=doc.splitTextToSize('"Dans le cadre de nos activités, nous sommes amenés à collecter des données à caractère personnel. Vous disposez d\'un droit d\'accès, de rectification et d\'opposition sur vos données personnelles en vous adressant par tout moyen directement à notre étude. Nous pourrons utiliser ces données afin de satisfaire à nos obligations légales et aux fins d\'exercice de notre activité. Ces données pourront également être communiquées aux autorités compétentes dès lors que la réglementation l\'impose."',CW);
+  doc.text(wRgpd,MG,y);y+=wRgpd.length*3.6+8;
 
   // ── SIGNATURE ──
   if(y>210){doc.addPage();y=20;}
@@ -2770,12 +2780,6 @@ async function exportEstimationVehiculePDF(){
       col++;if(col===2){col=0;py+=bH+6;}
     });
   }
-
-  // ── MENTION RGPD (tout à la fin, après la signature et le tampon) ──
-  if(y>262){doc.addPage();y=16;}
-  sf(false,7,TC2);
-  var wRgpd=doc.splitTextToSize('"Dans le cadre de nos activités, nous sommes amenés à collecter des données à caractère personnel. Vous disposez d\'un droit d\'accès, de rectification et d\'opposition sur vos données personnelles en vous adressant par tout moyen directement à notre étude. Nous pourrons utiliser ces données afin de satisfaire à nos obligations légales et aux fins d\'exercice de notre activité. Ces données pourront également être communiquées aux autorités compétentes dès lors que la réglementation l\'impose."',CW);
-  doc.text(wRgpd,MG,y);y+=wRgpd.length*3.6+8;
 
   // Pied de page (mentions légales + numérotation sur toutes les pages)
   var totalPages=doc.internal.getNumberOfPages();
