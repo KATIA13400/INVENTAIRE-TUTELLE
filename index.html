@@ -393,6 +393,7 @@ function initGoogleDrive(){
         getOrCreateDriveFolder().then(function(folderId){
           gdriveFolderId = folderId;
           console.log('Dossier Drive prêt:', folderId);
+          resyncPhotosNonSynchronisees();
         });
       }
     }
@@ -413,6 +414,7 @@ function demanderAccesDrive(){
           gdriveFolderId = folderId;
           alert('✅ Google Drive connecté !\nVos PDF seront sauvegardés dans :\n"' + GDRIVE_FOLDER_NAME + '"');
           updateDriveStatus();
+          resyncPhotosNonSynchronisees();
         });
       }
     }
@@ -3602,6 +3604,28 @@ async function fbChargerPhotos(dossierId,callback){
     idsDejaCharges[meta.id]=true;
   });
   if(callback)callback(loaded);
+}
+
+// ── RESYNCHRONISATION DES PHOTOS RESTÉES LOCALES ─────────────────────────
+// Une photo ajoutée pendant que l'envoi Drive échouait (jeton expiré, etc.)
+// reste dans le cache de cet appareil sans jamais être écrite dans Firebase
+// (photometa) — donc invisible ailleurs, indéfiniment, tant que personne ne
+// retente l'envoi. On retente automatiquement dès qu'une connexion Drive
+// réussit sur CET appareil (celui qui détient réellement les photos).
+async function resyncPhotosNonSynchronisees(){
+  if(!gdriveAccessToken)return;
+  var entries=await idbGetAllByPrefix('photo_');
+  var aResync=entries.filter(function(entry){
+    var meta=entry.value&&entry.value.meta;
+    return meta&&!meta.driveFileId&&entry.value.src;
+  });
+  if(aResync.length===0)return;
+  console.log('Resynchronisation de '+aResync.length+' photo(s) non envoyée(s) vers Drive…');
+  for(var i=0;i<aResync.length;i++){
+    var meta=aResync[i].value.meta;
+    var src=aResync[i].value.src;
+    try{await fbSauverPhoto(meta.dossierId,meta.rowId,meta.id,src,meta.label);}catch(e){}
+  }
 }
 </script>
 
