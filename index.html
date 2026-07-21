@@ -1577,7 +1577,6 @@ async function exportPDF(){
 
   // ── ANNEXE PHOTOS ────────────────────────────────────────────────────────
   const pts=photos.filter(p=>p.src).sort((a,b)=>(a.lineNum||999)-(b.lineNum||999));
-  const photoLinksInv=[];
   if(pts.length>0){
     doc.addPage();let py=16;
     fill(TC1);doc.rect(MG,py,CW,9,'F');
@@ -1586,27 +1585,11 @@ async function exportPDF(){
     pts.forEach(p=>{
       if(py+bH>280){doc.addPage();py=16;}
       const x=MG+(col*(iW+8));
-      const caption=p.lineNum>0?'Photo - Ligne '+p.lineNum:'Photo';
       drw(TC4);fill(WHITE);doc.rect(x,py,iW,iH+cH+2,'FD');
       try{doc.addImage(p.src,'JPEG',x+1,py+1,iW-2,iH,'','FAST');}catch(e){}
-      photoLinksInv.push({thumbPage:doc.internal.getNumberOfPages(),x:x+1,y:py+1,w:iW-2,h:iH,caption:caption,src:p.src});
       fill(TC5);doc.rect(x,py+iH+1,iW,cH,'F');
       sf(true,8,TC1);doc.text(p.lineNum>0?'Photo - Ligne '+p.lineNum:'',x+iW/2,py+iH+1+cH/2+1.5,{align:'center'});
       col++;if(col===2){col=0;py+=bH+6;}
-    });
-    // Une page détail (agrandie) par photo, reliée par des liens internes au PDF
-    // (fonctionne pour n'importe quel lecteur, sans dépendre d'un compte Drive/Google).
-    photoLinksInv.forEach(function(pl){
-      doc.addPage();
-      const detailPage=doc.internal.getNumberOfPages();
-      fill(TC1);doc.rect(MG,16,CW,9,'F');
-      sf(true,12,WHITE);doc.text(pl.caption,W/2,16+6,{align:'center'});
-      const dy=30;
-      try{doc.addImage(pl.src,'JPEG',MG,dy,CW,230,'','FAST');}catch(e){}
-      sf(false,9,TC2);doc.text('‹ Retour à l\'annexe photographique',MG,dy+238);
-      doc.link(MG,dy+233,95,7,{pageNumber:pl.thumbPage});
-      doc.setPage(pl.thumbPage);
-      doc.link(pl.x,pl.y,pl.w,pl.h,{pageNumber:detailPage});
     });
   }
 
@@ -2917,7 +2900,6 @@ async function exportEstimationVehiculePDF(){
     var ob=(b.label in slotOrder)?slotOrder[b.label]:999;
     return oa-ob;
   });
-  var photoLinksVeh=[];
   if(ptsVeh.length>0){
     doc.addPage();var py=16;
     fill(TC1);doc.rect(MG,py,CW,9,'F');
@@ -2930,25 +2912,9 @@ async function exportEstimationVehiculePDF(){
       var caption=slot?slot.label:('Photo '+(++complIdx));
       drw(TC4);fill(WHITE);doc.rect(x,py,iW,iH+cH+2,'FD');
       try{doc.addImage(p.src,'JPEG',x+1,py+1,iW-2,iH,'','FAST');}catch(e){}
-      photoLinksVeh.push({thumbPage:doc.internal.getNumberOfPages(),x:x+1,y:py+1,w:iW-2,h:iH,caption:caption,src:p.src});
       fill(TC5);doc.rect(x,py+iH+1,iW,cH,'F');
       sf(true,8,TC1);doc.text(caption,x+iW/2,py+iH+1+cH/2+1.5,{align:'center'});
       col++;if(col===2){col=0;py+=bH+6;}
-    });
-    // Une page détail (agrandie) par photo, ajoutée après la grille de vignettes,
-    // reliée dans les deux sens par des liens internes au PDF (fonctionne pour
-    // n'importe quel lecteur, sans dépendre d'un compte Drive/Google).
-    photoLinksVeh.forEach(function(pl){
-      doc.addPage();
-      var detailPage=doc.internal.getNumberOfPages();
-      fill(TC1);doc.rect(MG,16,CW,9,'F');
-      sf(true,12,WHITE);doc.text(pl.caption,W/2,16+6,{align:'center'});
-      var dy=30;
-      try{doc.addImage(pl.src,'JPEG',MG,dy,CW,230,'','FAST');}catch(e){}
-      sf(false,9,TC2);doc.text('‹ Retour à l\'annexe photographique',MG,dy+238);
-      doc.link(MG,dy+233,95,7,{pageNumber:pl.thumbPage});
-      doc.setPage(pl.thumbPage);
-      doc.link(pl.x,pl.y,pl.w,pl.h,{pageNumber:detailPage});
     });
   }
 
