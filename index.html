@@ -3337,10 +3337,10 @@ async function fbSauverPhoto(dossierId,rowId,photoId,src,label){
   var idbKey='photo_'+dossierId+'_'+rowId+'_'+photoId;
   var meta={id:photoId,rowId:rowId,dossierId:dossierId,label:label||'',driveFileId:null,date:Date.now()};
   await idbSet(idbKey,{meta:meta,src:src});
-  if(!gdriveAccessToken)return;
+  if(!gdriveAccessToken){showDriveReconnect();return;}
   try{
     var folderId=await getDrivePhotosFolderId();
-    if(!folderId)return;
+    if(!folderId){showDriveReconnect();return;}
     var b64=src.split(',')[1];
     var bc=atob(b64);var ba=new Uint8Array(bc.length);
     for(var i=0;i<bc.length;i++)ba[i]=bc.charCodeAt(i);
@@ -3355,8 +3355,10 @@ async function fbSauverPhoto(dossierId,rowId,photoId,src,label){
       meta.driveFileId=data.id;
       await idbSet(idbKey,{meta:meta,src:src});
       fbdb.ref('photometa/'+dossierId+'/'+rowId+'/'+photoId).set(meta).catch(function(){});
+    } else {
+      showDriveReconnect();
     }
-  }catch(e){console.warn('Drive upload photo:',e);}
+  }catch(e){console.warn('Drive upload photo:',e);showDriveReconnect();}
 }
 
 async function fbSupprimerPhoto(dossierId,rowId,photoId){
@@ -3436,6 +3438,22 @@ async function fbChargerPhotos(dossierId,callback){
       showDriveReconnect();
     }
   }
+  // Filet de sécurité : une photo présente uniquement dans le cache de cet
+  // appareil (ex : upload Drive resté silencieusement en échec, jeton expiré)
+  // ne doit pas disparaître sur cet appareil pour autant.
+  var idsDejaCharges={};
+  Object.keys(loaded).forEach(function(rid){
+    loaded[rid].forEach(function(p){idsDejaCharges[p.id]=true;});
+  });
+  entries.forEach(function(entry){
+    var meta=entry.value&&entry.value.meta;
+    var src=entry.value&&entry.value.src;
+    if(!meta||!src||idsDejaCharges[meta.id])return;
+    var rid=String(meta.rowId);
+    if(!loaded[rid])loaded[rid]=[];
+    loaded[rid].push({id:meta.id,src:src,label:meta.label||''});
+    idsDejaCharges[meta.id]=true;
+  });
   if(callback)callback(loaded);
 }
 </script>
