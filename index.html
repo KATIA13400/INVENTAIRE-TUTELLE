@@ -941,6 +941,7 @@ function updateDriveStatus(){
       <div class="fg"><label>Modèle</label><input id="veh-modele" placeholder="Ex : MONDEO"/></div>
       <div class="fg"><label>Immatriculation</label><input id="veh-immat" placeholder="Ex : BT-916-AT"/></div>
       <div class="fg"><label>1ère mise en circulation</label><input type="date" id="veh-date-circulation"/></div>
+      <div class="fg"><label>Date d'immatriculation</label><input type="date" id="veh-date-immatriculation"/></div>
       <div class="fg"><label>Nombre de portes</label><input type="number" id="veh-portes" min="0" step="1"/></div>
       <div class="fg"><label>Énergie</label>
         <select id="veh-energie">
@@ -1543,6 +1544,7 @@ async function exportPDF(){
       const x=MG+(col*(iW+8));
       drw(TC4);fill(WHITE);doc.rect(x,py,iW,iH+cH+2,'FD');
       try{doc.addImage(p.src,'JPEG',x+1,py+1,iW-2,iH,'','FAST');}catch(e){}
+      if(p.driveFileId)doc.link(x+1,py+1,iW-2,iH,{url:'https://drive.google.com/file/d/'+p.driveFileId+'/view'});
       fill(TC5);doc.rect(x,py+iH+1,iW,cH,'F');
       sf(true,8,TC1);doc.text(p.lineNum>0?'Photo - Ligne '+p.lineNum:'',x+iW/2,py+iH+1+cH/2+1.5,{align:'center'});
       col++;if(col===2){col=0;py+=bH+6;}
@@ -2168,7 +2170,7 @@ async function extractCarteGrise(b64,mimeType,apiKey){
     const contentBlock=isPdf
       ?{type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}}
       :{type:'image',source:{type:'base64',media_type:mimeType||'image/jpeg',data:b64}};
-    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:800,system:'Tu es un extracteur de données automobiles. Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans markdown, sans explication.',messages:[{role:'user',content:[contentBlock,{type:'text',text:'Extrais les informations de cette carte grise (certificat d\'immatriculation français). Attention à la date de première mise en circulation (champ B, en haut à droite du recto) : ne la confonds JAMAIS avec la date d\'émission de CE certificat (champ I, ou toute date liée à un duplicata/changement d\'adresse/de titulaire) — cette dernière peut être très récente même si le véhicule est ancien. dateCirculation doit correspondre exclusivement au champ B. Réponds UNIQUEMENT avec ce JSON (rien d\'autre), laisse une valeur vide "" si l\'information n\'est pas trouvée : {"immat":"numéro d\'immatriculation (A)","dateCirculation":"date de première immatriculation, champ B uniquement, au format JJ/MM/AAAA","marque":"marque du véhicule (D.1)","modele":"dénomination commerciale (D.3)","energie":"Essence ou Diesel ou Électrique ou Hybride ou GPL déduit du type de carburant (P.3)","portes":"nombre de portes si mentionné","sieges":"nombre de places assises (S.1)","couleur":"couleur du véhicule si mentionnée"}'}]}]})});
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:800,system:'Tu es un extracteur de données automobiles. Tu réponds UNIQUEMENT avec un objet JSON valide, sans texte avant ni après, sans markdown, sans explication.',messages:[{role:'user',content:[contentBlock,{type:'text',text:'Extrais les informations de cette carte grise (certificat d\'immatriculation français). Attention, il y a DEUX dates distinctes à ne jamais confondre : (1) dateCirculation = date de première mise en circulation du véhicule (champ B, en haut à droite du recto) — c\'est une date historique, propre au véhicule ; (2) dateImmatriculation = date d\'immatriculation de CE certificat actuel (champ I) — cette date correspond à l\'établissement du document présent (duplicata, changement d\'adresse ou de titulaire, etc.) et peut être bien plus récente que le champ B même si le véhicule est ancien. Extrais chacune séparément, sans jamais mettre la valeur de l\'une dans l\'autre. Réponds UNIQUEMENT avec ce JSON (rien d\'autre), laisse une valeur vide "" si l\'information n\'est pas trouvée : {"immat":"numéro d\'immatriculation (A)","dateCirculation":"date de première mise en circulation, champ B uniquement, au format JJ/MM/AAAA","dateImmatriculation":"date d\'immatriculation de ce certificat, champ I uniquement, au format JJ/MM/AAAA","marque":"marque du véhicule (D.1)","modele":"dénomination commerciale (D.3)","energie":"Essence ou Diesel ou Électrique ou Hybride ou GPL déduit du type de carburant (P.3)","portes":"nombre de portes si mentionné","sieges":"nombre de places assises (S.1)","couleur":"couleur du véhicule si mentionnée"}'}]}]})});
     const data=await resp.json();if(data.error)throw new Error(data.error.message);
     const parsed=JSON.parse(data.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim());
     const map={marque:'veh-marque',modele:'veh-modele',immat:'veh-immat',portes:'veh-portes',energie:'veh-energie',couleur:'veh-couleur',sieges:'veh-sieges'};
@@ -2176,6 +2178,10 @@ async function extractCarteGrise(b64,mimeType,apiKey){
     if(parsed.dateCirculation){
       const p=parsed.dateCirculation.split('/');
       if(p.length===3){const el=document.getElementById('veh-date-circulation');if(el)el.value=p[2]+'-'+p[1]+'-'+p[0];}
+    }
+    if(parsed.dateImmatriculation){
+      const p2=parsed.dateImmatriculation.split('/');
+      if(p2.length===3){const el2=document.getElementById('veh-date-immatriculation');if(el2)el2.value=p2[2]+'-'+p2[1]+'-'+p2[0];}
     }
     setCarteGriseStatus('ok','Informations extraites : '+((parsed.marque||'')+' '+(parsed.modele||'')).trim());
     autosave();
@@ -2300,7 +2306,7 @@ function ouvrirModalNouveauDossier(estimVehicule){
 }
 
 function vehiculeParDefaut(){
-  return {marque:'',modele:'',immat:'',dateCirculation:'',portes:'',energie:'',couleur:'',
+  return {marque:'',modele:'',immat:'',dateCirculation:'',dateImmatriculation:'',portes:'',energie:'',couleur:'',
     kms:'',boite:'',sieges:'',realisePar:'',equipements:{},etat:'',ficheIdentif:false,carteGrise:false,
     remarques:'',descriptionEtat:'',proposerAbandon:false,mentionVente:false,estimation:'',
     dommages:[],typeSchema:'voiture'};
@@ -2346,7 +2352,7 @@ function getVehicule(){
   });
   return {
     marque:v('veh-marque'),modele:v('veh-modele'),immat:v('veh-immat'),
-    dateCirculation:v('veh-date-circulation'),portes:v('veh-portes'),
+    dateCirculation:v('veh-date-circulation'),dateImmatriculation:v('veh-date-immatriculation'),portes:v('veh-portes'),
     energie:v('veh-energie'),couleur:v('veh-couleur'),kms:v('veh-kms'),boite:v('veh-boite'),
     sieges:v('veh-sieges'),realisePar:v('veh-realise-par'),equipements:equipements,
     etat:(d.vehicule&&d.vehicule.etat)||'',
@@ -2665,6 +2671,7 @@ async function exportEstimationVehiculePDF(){
   sousTitre('VÉHICULE');
   ligneInfo('Marque',veh.marque,'Modèle',veh.modele);
   ligneInfo('Immatriculation',veh.immat,'1ère MEC',fd2(veh.dateCirculation));
+  ligneInfo('Date d\'immatriculation',fd2(veh.dateImmatriculation),'','');
   ligneInfo('Nb portes',veh.portes,'Énergie',veh.energie);
   ligneInfo('Couleur',veh.couleur,'Kilométrage',veh.kms?veh.kms+' km':'');
   ligneInfo('Boîte',veh.boite,'Nb sièges',veh.sieges);
@@ -2784,6 +2791,7 @@ async function exportEstimationVehiculePDF(){
       var x=MG+(col*(iW+8));
       drw(TC4);fill(WHITE);doc.rect(x,py,iW,iH+cH+2,'FD');
       try{doc.addImage(p.src,'JPEG',x+1,py+1,iW-2,iH,'','FAST');}catch(e){}
+      if(p.driveFileId)doc.link(x+1,py+1,iW-2,iH,{url:'https://drive.google.com/file/d/'+p.driveFileId+'/view'});
       fill(TC5);doc.rect(x,py+iH+1,iW,cH,'F');
       sf(true,8,TC1);doc.text('Photo '+(i+1),x+iW/2,py+iH+1+cH/2+1.5,{align:'center'});
       col++;if(col===2){col=0;py+=bH+6;}
@@ -2888,7 +2896,7 @@ function ouvrirDossier(id){
     var generales = loaded['0']||[];
     delete loaded['0'];
     rowPhotos = loaded;
-    photos = generales.map(function(p){return {id:p.id, src:p.src, lineNum:0};});
+    photos = generales.map(function(p){return {id:p.id, src:p.src, lineNum:0, driveFileId:p.driveFileId||null};});
     renderRows();
     syncRowPhotosToGallery();
   });
@@ -2901,6 +2909,7 @@ function ouvrirDossier(id){
     if(!d.vehicule)d.vehicule=vehiculeParDefaut();
     var veh=d.vehicule;
     var mapVeh={marque:'veh-marque',modele:'veh-modele',immat:'veh-immat',dateCirculation:'veh-date-circulation',
+      dateImmatriculation:'veh-date-immatriculation',
       portes:'veh-portes',energie:'veh-energie',couleur:'veh-couleur',kms:'veh-kms',boite:'veh-boite',sieges:'veh-sieges',
       realisePar:'veh-realise-par',remarques:'veh-remarques',descriptionEtat:'veh-description-etat',estimation:'veh-estimation'};
     Object.keys(mapVeh).forEach(function(k){
@@ -3185,7 +3194,7 @@ function syncRowPhotosToGallery(){
   var fromRows = [];
   Object.keys(rowPhotos).forEach(function(rid){
     (rowPhotos[rid]||[]).forEach(function(p){
-      fromRows.push({id:p.id, src:p.src, lineNum:parseInt(rid), rowId:parseInt(rid)});
+      fromRows.push({id:p.id, src:p.src, lineNum:parseInt(rid), rowId:parseInt(rid), driveFileId:p.driveFileId||null});
     });
   });
   photos = orphans.concat(fromRows);
@@ -3420,7 +3429,7 @@ async function fbChargerPhotos(dossierId,callback){
       var srcCache=cacheByPhotoId[photoId];
       if(srcCache){
         if(!loaded[rid])loaded[rid]=[];
-        loaded[rid].push({id:m.id,src:srcCache,label:m.label||''});
+        loaded[rid].push({id:m.id,src:srcCache,label:m.label||'',driveFileId:m.driveFileId||null});
       } else if(m.driveFileId){
         aTelecharger.push(m);
       }
@@ -3437,7 +3446,7 @@ async function fbChargerPhotos(dossierId,callback){
           var s=await new Promise(function(res){var fr=new FileReader();fr.onload=function(){res(fr.result);};fr.readAsDataURL(b);});
           var rid2=String(m2.rowId);
           if(!loaded[rid2])loaded[rid2]=[];
-          loaded[rid2].push({id:m2.id,src:s,label:m2.label||''});
+          loaded[rid2].push({id:m2.id,src:s,label:m2.label||'',driveFileId:m2.driveFileId||null});
           await idbSet('photo_'+dossierId+'_'+m2.rowId+'_'+m2.id,{meta:m2,src:s});
         }catch(e){}
       }
@@ -3458,7 +3467,7 @@ async function fbChargerPhotos(dossierId,callback){
     if(!meta||!src||idsDejaCharges[meta.id])return;
     var rid=String(meta.rowId);
     if(!loaded[rid])loaded[rid]=[];
-    loaded[rid].push({id:meta.id,src:src,label:meta.label||''});
+    loaded[rid].push({id:meta.id,src:src,label:meta.label||'',driveFileId:meta.driveFileId||null});
     idsDejaCharges[meta.id]=true;
   });
   if(callback)callback(loaded);
