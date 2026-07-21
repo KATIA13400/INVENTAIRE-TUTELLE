@@ -380,25 +380,37 @@ const GDRIVE_FOLDER_NAME = 'Inventaires Tutelle - FAGIANO';
 var gdriveAccessToken = null;
 var gdriveFolderId = null;
 
-// Initialiser Google Drive Auth
+// Initialiser Google Drive Auth — tente une reconnexion SILENCIEUSE (sans popup)
+// dès que la bibliothèque Google est chargée, puis toutes les 45 min (le jeton
+// expire après ~1h). Fonctionne sans redemander l'autorisation tant que la
+// session Google du navigateur est valide et le consentement déjà accordé.
 function initGoogleDrive(){
-  google.accounts.oauth2.initTokenClient({
+  if(!window.google || !google.accounts || !google.accounts.oauth2){
+    setTimeout(initGoogleDrive, 400);
+    return;
+  }
+  var client = google.accounts.oauth2.initTokenClient({
     client_id: GDRIVE_CLIENT_ID,
     scope: 'https://www.googleapis.com/auth/drive.file',
     callback: function(response){
-      if(response.access_token){
+      if(response && response.access_token){
         gdriveAccessToken = response.access_token;
-        console.log('Google Drive connecté ✅');
-        // Trouver ou créer le dossier partagé
+        console.log('Google Drive reconnecté automatiquement ✅');
         getOrCreateDriveFolder().then(function(folderId){
           gdriveFolderId = folderId;
-          console.log('Dossier Drive prêt:', folderId);
+          updateDriveStatus();
           resyncPhotosNonSynchronisees();
         });
       }
+    },
+    error_callback: function(){
+      console.log('Reconnexion Drive automatique impossible — connexion manuelle nécessaire.');
     }
   });
+  try{ client.requestAccessToken({prompt:''}); }catch(e){}
 }
+document.addEventListener('DOMContentLoaded', function(){ setTimeout(initGoogleDrive, 800); });
+setInterval(function(){ initGoogleDrive(); }, 45*60*1000);
 
 // Demander l'autorisation
 function demanderAccesDrive(){
@@ -420,6 +432,16 @@ function demanderAccesDrive(){
     }
   });
   client.requestAccessToken();
+}
+
+// Bloque l'ajout d'une photo tant que Drive n'est pas connecté sur ce poste,
+// pour ne plus jamais avoir de photo qui reste piégée localement sans que
+// personne ne le sache.
+function exigerDrive(){
+  if(gdriveAccessToken) return true;
+  var veut = confirm('Google Drive n\'est pas connecté sur ce poste.\n\nSans connexion, cette photo resterait uniquement sur cet ordinateur et ne serait pas visible ailleurs.\n\nSe connecter maintenant ?');
+  if(veut) demanderAccesDrive();
+  return false;
 }
 
 // Trouver ou créer le dossier "Inventaires Tutelle"
@@ -1978,6 +2000,7 @@ function compressImage(dataUrl, maxW, quality, cb){
   img.src=dataUrl;
 }
 function handlePhotoFiles(files){
+  if(!exigerDrive())return;
   const arr=Array.from(files);
   arr.forEach(file=>{
     if(!file.type.startsWith('image/'))return;
@@ -2028,6 +2051,7 @@ function isSlotPhoto(p){return VEHICULE_PHOTO_SLOTS.some(function(s){return s.ke
 function ouvrirSlotPhoto(slotKey){_vehSlotTarget=slotKey;document.getElementById('veh-slot-input').click();}
 function handleSlotPhotoInputChange(file){
   if(!file||!_vehSlotTarget)return;
+  if(!exigerDrive()){document.getElementById('veh-slot-input').value='';return;}
   var slotKey=_vehSlotTarget;
   var reader=new FileReader();
   reader.onload=function(ev){
@@ -3257,6 +3281,7 @@ function mrpHandleDrop(e){
 
 function mrpHandleFiles(files){
   if(!_mrpCurrentRowId) return;
+  if(!exigerDrive()) return;
   Array.from(files).forEach(function(file){
     if(!file.type.startsWith('image/')) return;
     var reader = new FileReader();
