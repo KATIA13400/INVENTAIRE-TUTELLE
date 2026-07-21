@@ -131,6 +131,15 @@ td textarea{overflow:hidden;line-height:1.5;min-height:28px}
 .photo-card .del-ph{position:absolute;top:3px;right:3px;background:rgba(0,0,0,.5);border:none;border-radius:50%;width:18px;height:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px}
 .del-ph:hover{background:rgba(180,0,0,.85)}
 .empty-ph{font-size:12px;color:var(--text3);text-align:center;padding:10px 0}
+.veh-photo-slots{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px}
+.veh-photo-slot{background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.veh-photo-slot .vps-label{font-size:10.5px;font-weight:600;color:var(--tc2);padding:5px 6px;background:var(--tc6);text-align:center}
+.veh-photo-slot .vps-body{height:90px;position:relative;cursor:pointer}
+.veh-photo-slot .vps-body img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.veh-photo-slot .vps-empty{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:var(--tc3);font-size:24px;border:2px dashed var(--border2)}
+.veh-photo-slot .vps-empty:hover{background:var(--tc5)}
+.veh-photo-slot .vps-del{position:absolute;top:3px;right:3px;background:rgba(0,0,0,.5);border:none;border-radius:50%;width:18px;height:18px;cursor:pointer;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center}
+.veh-photo-slot .vps-del:hover{background:rgba(180,0,0,.85)}
 
 /* Buttons */
 .footer-row{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:1rem}
@@ -965,6 +974,12 @@ function updateDriveStatus(){
       <div class="fg"><label>Nombre de sièges</label><input type="number" id="veh-sieges" min="0" step="1"/></div>
       <div class="fg"><label>Estimation réalisée par</label><input id="veh-realise-par" placeholder="Maître Katia FAGIANO"/></div>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="section-label"><i class="ti ti-camera" style="font-size:14px"></i>Photos du véhicule <span style="font-size:10px;font-weight:400;color:var(--tc3);margin-left:8px"><i class="ti ti-info-circle"></i> Cliquez sur chaque case pour ajouter la photo correspondante</span></div>
+    <div class="veh-photo-slots" id="veh-photo-slots"></div>
+    <input type="file" id="veh-slot-input" accept="image/*" style="display:none" onchange="handleSlotPhotoInputChange(this.files[0])"/>
   </div>
 
   <div class="card">
@@ -1960,11 +1975,14 @@ function handlePhotoFiles(files){
 function removePhoto(id){photos=photos.filter(p=>p.id!==id);renderGallery();if(currentDossierId)fbSupprimerPhoto(currentDossierId,0,id);}
 function setPhotoLine(id,val){const p=photos.find(p=>p.id===id);if(p)p.lineNum=parseInt(val)||0;}
 function renderGallery(){
+  renderVehiculePhotoSlots();
   var el=document.getElementById('photo-gallery');
-  if(photos.length===0){el.innerHTML='<div class="empty-ph">Aucune photo ajoutée</div>';return;}
+  var visibles=photos.filter(function(p){return !isSlotPhoto(p);});
+  if(visibles.length===0){el.innerHTML='<div class="empty-ph">Aucune photo ajoutée</div>';return;}
   var nums=[0];rows.forEach(function(_,i){nums.push(i+1);});
   var html='<div class="photo-grid">';
-  photos.forEach(function(p,i){
+  visibles.forEach(function(p){
+    var i=photos.indexOf(p);
     var badge=p.lineNum>0?'<span class="badge-num">#'+p.lineNum+'</span>':'';
     var opts='';
     nums.forEach(function(n){
@@ -1979,6 +1997,52 @@ function renderGallery(){
     html+='</div>';
   });
   html+='</div>';
+  el.innerHTML=html;
+}
+
+// ── PHOTOS DU VÉHICULE PAR EMPLACEMENT FIXE ────────────────────────────────
+var _vehSlotTarget=null;
+function isSlotPhoto(p){return VEHICULE_PHOTO_SLOTS.some(function(s){return s.key===p.label;});}
+function ouvrirSlotPhoto(slotKey){_vehSlotTarget=slotKey;document.getElementById('veh-slot-input').click();}
+function handleSlotPhotoInputChange(file){
+  if(!file||!_vehSlotTarget)return;
+  var slotKey=_vehSlotTarget;
+  var reader=new FileReader();
+  reader.onload=function(ev){
+    compressImage(ev.target.result,600,0.5,function(compressed){
+      var existant=photos.find(function(p){return p.label===slotKey;});
+      if(existant){
+        photos=photos.filter(function(p){return p.id!==existant.id;});
+        if(currentDossierId)fbSupprimerPhoto(currentDossierId,0,existant.id);
+      }
+      var photoId=Date.now()+"_"+Math.floor(Math.random()*100000);
+      photos.push({id:photoId,src:compressed,lineNum:0,label:slotKey});
+      renderGallery();
+      if(currentDossierId)fbSauverPhoto(currentDossierId,0,photoId,compressed,slotKey);
+    });
+  };
+  reader.readAsDataURL(file);
+  document.getElementById('veh-slot-input').value='';
+}
+function removeSlotPhoto(slotKey){
+  var p=photos.find(function(p){return p.label===slotKey;});
+  if(p)removePhoto(p.id);
+}
+function renderVehiculePhotoSlots(){
+  var el=document.getElementById('veh-photo-slots');
+  if(!el)return;
+  var html='';
+  VEHICULE_PHOTO_SLOTS.forEach(function(slot){
+    var p=photos.find(function(ph){return ph.label===slot.key;});
+    html+='<div class="veh-photo-slot"><div class="vps-label">'+slot.label+'</div>';
+    if(p){
+      var idx=photos.indexOf(p);
+      html+='<div class="vps-body"><img src="'+p.src+'" onclick="openZoom('+idx+')" title="Cliquer pour agrandir"/><button class="vps-del" onclick="event.stopPropagation();removeSlotPhoto(\''+slot.key+'\')">x</button></div>';
+    } else {
+      html+='<div class="vps-body" onclick="ouvrirSlotPhoto(\''+slot.key+'\')"><div class="vps-empty"><i class="ti ti-camera-plus"></i></div></div>';
+    }
+    html+='</div>';
+  });
   el.innerHTML=html;
 }
 
@@ -2333,6 +2397,16 @@ var EQUIPEMENTS_VEHICULE=[
   {key:'vitresElectriques',label:'Vitres électriques'},
   {key:'roueSecours',label:'Roue de secours'},
   {key:'radarAr',label:'Radar de recul (AR)'}
+];
+
+var VEHICULE_PHOTO_SLOTS=[
+  {key:'avant',label:'Photo avant véhicule'},
+  {key:'arriere',label:'Photo arrière véhicule'},
+  {key:'lateralDroit',label:'Photo latérale droite'},
+  {key:'lateralGauche',label:'Photo latérale gauche'},
+  {key:'compteur',label:'Photo compteur'},
+  {key:'boiteVitesse',label:'Photo boîte de vitesses'},
+  {key:'interieur',label:'Photo intérieur général'}
 ];
 
 function appliquerModeDossier(estimVehicule){
@@ -2780,20 +2854,27 @@ async function exportEstimationVehiculePDF(){
   y+=54;
 
   // ── ANNEXE PHOTOS ────────────────────────────────────────────────────────
-  var ptsVeh=photos.filter(function(p){return p.src;});
+  var slotOrder={};VEHICULE_PHOTO_SLOTS.forEach(function(s,i){slotOrder[s.key]=i;});
+  var ptsVeh=photos.filter(function(p){return p.src;}).slice().sort(function(a,b){
+    var oa=(a.label in slotOrder)?slotOrder[a.label]:999;
+    var ob=(b.label in slotOrder)?slotOrder[b.label]:999;
+    return oa-ob;
+  });
   if(ptsVeh.length>0){
     doc.addPage();var py=16;
     fill(TC1);doc.rect(MG,py,CW,9,'F');
     sf(true,12,WHITE);doc.text('ANNEXE PHOTOGRAPHIQUE',W/2,py+6,{align:'center'});py+=13;
-    var iW=(CW-8)/2,iH=75,cH=8,bH=iH+cH+4,col=0;
+    var iW=(CW-8)/2,iH=75,cH=8,bH=iH+cH+4,col=0,complIdx=0;
     ptsVeh.forEach(function(p,i){
       if(py+bH>280){doc.addPage();py=16;}
       var x=MG+(col*(iW+8));
+      var slot=VEHICULE_PHOTO_SLOTS.find(function(s){return s.key===p.label;});
+      var caption=slot?slot.label:('Photo '+(++complIdx));
       drw(TC4);fill(WHITE);doc.rect(x,py,iW,iH+cH+2,'FD');
       try{doc.addImage(p.src,'JPEG',x+1,py+1,iW-2,iH,'','FAST');}catch(e){}
       if(p.driveFileId)doc.link(x+1,py+1,iW-2,iH,{url:'https://drive.google.com/file/d/'+p.driveFileId+'/view'});
       fill(TC5);doc.rect(x,py+iH+1,iW,cH,'F');
-      sf(true,8,TC1);doc.text('Photo '+(i+1),x+iW/2,py+iH+1+cH/2+1.5,{align:'center'});
+      sf(true,8,TC1);doc.text(caption,x+iW/2,py+iH+1+cH/2+1.5,{align:'center'});
       col++;if(col===2){col=0;py+=bH+6;}
     });
   }
