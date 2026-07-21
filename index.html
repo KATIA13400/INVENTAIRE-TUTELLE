@@ -954,6 +954,13 @@ function updateDriveStatus(){
       </div>
       <div class="fg"><label>Couleur</label><input id="veh-couleur"/></div>
       <div class="fg"><label>Kilométrage</label><input type="number" id="veh-kms" min="0" step="1"/></div>
+      <div class="fg"><label>Boîte</label>
+        <select id="veh-boite">
+          <option value="">—</option>
+          <option value="Automatique">Automatique</option>
+          <option value="Mécanique">Mécanique</option>
+        </select>
+      </div>
       <div class="fg"><label>Nombre de sièges</label><input type="number" id="veh-sieges" min="0" step="1"/></div>
       <div class="fg"><label>Estimation réalisée par</label><input id="veh-realise-par" placeholder="Maître Katia FAGIANO"/></div>
     </div>
@@ -2294,7 +2301,7 @@ function ouvrirModalNouveauDossier(estimVehicule){
 
 function vehiculeParDefaut(){
   return {marque:'',modele:'',immat:'',dateCirculation:'',portes:'',energie:'',couleur:'',
-    kms:'',sieges:'',realisePar:'',equipements:{},etat:'',ficheIdentif:false,carteGrise:false,
+    kms:'',boite:'',sieges:'',realisePar:'',equipements:{},etat:'',ficheIdentif:false,carteGrise:false,
     remarques:'',descriptionEtat:'',proposerAbandon:false,mentionVente:false,estimation:'',
     dommages:[],typeSchema:'voiture'};
 }
@@ -2304,7 +2311,6 @@ var EQUIPEMENTS_VEHICULE=[
   {key:'airbag',label:'Airbag'},
   {key:'antivol',label:'Antivol'},
   {key:'autoradio',label:'Autoradio'},
-  {key:'boiteAuto',label:'Boîte automatique'},
   {key:'clim',label:'Climatisation'},
   {key:'cuir',label:'Sièges cuir'},
   {key:'directionAssistee',label:'Direction assistée'},
@@ -2341,7 +2347,7 @@ function getVehicule(){
   return {
     marque:v('veh-marque'),modele:v('veh-modele'),immat:v('veh-immat'),
     dateCirculation:v('veh-date-circulation'),portes:v('veh-portes'),
-    energie:v('veh-energie'),couleur:v('veh-couleur'),kms:v('veh-kms'),
+    energie:v('veh-energie'),couleur:v('veh-couleur'),kms:v('veh-kms'),boite:v('veh-boite'),
     sieges:v('veh-sieges'),realisePar:v('veh-realise-par'),equipements:equipements,
     etat:(d.vehicule&&d.vehicule.etat)||'',
     ficheIdentif:document.getElementById('veh-fiche-identif')?document.getElementById('veh-fiche-identif').checked:false,
@@ -2661,7 +2667,8 @@ async function exportEstimationVehiculePDF(){
   ligneInfo('Immatriculation',veh.immat,'1ère MEC',fd2(veh.dateCirculation));
   ligneInfo('Nb portes',veh.portes,'Énergie',veh.energie);
   ligneInfo('Couleur',veh.couleur,'Kilométrage',veh.kms?veh.kms+' km':'');
-  ligneInfo('Nb sièges',veh.sieges,'Localisation véhicule',h.dosAdresse);
+  ligneInfo('Boîte',veh.boite,'Nb sièges',veh.sieges);
+  ligneInfo('Localisation véhicule',h.dosAdresse,'','');
   ligneInfo('État du véhicule',veh.descriptionEtat,'','');
   y+=6;
 
@@ -2771,7 +2778,7 @@ async function exportEstimationVehiculePDF(){
     doc.addPage();var py=16;
     fill(TC1);doc.rect(MG,py,CW,9,'F');
     sf(true,12,WHITE);doc.text('ANNEXE PHOTOGRAPHIQUE',W/2,py+6,{align:'center'});py+=13;
-    var iW=(CW-8)/2,iH=65,cH=8,bH=iH+cH+4,col=0;
+    var iW=(CW-8)/2,iH=75,cH=8,bH=iH+cH+4,col=0;
     ptsVeh.forEach(function(p,i){
       if(py+bH>280){doc.addPage();py=16;}
       var x=MG+(col*(iW+8));
@@ -2894,7 +2901,7 @@ function ouvrirDossier(id){
     if(!d.vehicule)d.vehicule=vehiculeParDefaut();
     var veh=d.vehicule;
     var mapVeh={marque:'veh-marque',modele:'veh-modele',immat:'veh-immat',dateCirculation:'veh-date-circulation',
-      portes:'veh-portes',energie:'veh-energie',couleur:'veh-couleur',kms:'veh-kms',sieges:'veh-sieges',
+      portes:'veh-portes',energie:'veh-energie',couleur:'veh-couleur',kms:'veh-kms',boite:'veh-boite',sieges:'veh-sieges',
       realisePar:'veh-realise-par',remarques:'veh-remarques',descriptionEtat:'veh-description-etat',estimation:'veh-estimation'};
     Object.keys(mapVeh).forEach(function(k){
       var el=document.getElementById(mapVeh[k]);
