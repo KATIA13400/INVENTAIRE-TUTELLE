@@ -949,8 +949,12 @@ function updateDriveStatus(){
       <div class="fg"><label>Marque</label><input id="veh-marque" placeholder="Ex : FORD"/></div>
       <div class="fg"><label>Modèle</label><input id="veh-modele" placeholder="Ex : MONDEO"/></div>
       <div class="fg"><label>Immatriculation</label><input id="veh-immat" placeholder="Ex : BT-916-AT"/></div>
-      <div class="fg"><label>1ère mise en circulation</label><input type="date" id="veh-date-circulation"/></div>
-      <div class="fg"><label>Date d'immatriculation</label><input type="date" id="veh-date-immatriculation"/></div>
+      <div class="fg"><label>1ère mise en circulation</label><input type="date" id="veh-date-circulation" oninput="updatePremiereMainBadge()"/></div>
+      <div class="fg"><label>Date d'immatriculation</label><input type="date" id="veh-date-immatriculation" oninput="updatePremiereMainBadge()"/></div>
+      <div class="fg" id="veh-premiere-main-wrap" style="display:none">
+        <label>&nbsp;</label>
+        <div style="padding:7px 0;color:#2a6a3a;font-weight:600;font-size:13px"><i class="ti ti-certificate"></i> Véhicule de première main</div>
+      </div>
       <div class="fg"><label>Nombre de portes</label><input type="number" id="veh-portes" min="0" step="1"/></div>
       <div class="fg"><label>Énergie</label>
         <select id="veh-energie">
@@ -2263,6 +2267,7 @@ async function extractCarteGrise(b64,mimeType,apiKey){
       const p2=parsed.dateImmatriculation.split('/');
       if(p2.length===3){const el2=document.getElementById('veh-date-immatriculation');if(el2)el2.value=p2[2]+'-'+p2[1]+'-'+p2[0];}
     }
+    updatePremiereMainBadge();
     setCarteGriseStatus('ok','Informations extraites : '+((parsed.marque||'')+' '+(parsed.modele||'')).trim());
     autosave();
   }catch(err){setCarteGriseStatus('err','Erreur : '+err.message);}
@@ -2422,7 +2427,8 @@ var VEHICULE_PHOTO_SLOTS=[
   {key:'lateralGauche',label:'Photo latérale gauche'},
   {key:'compteur',label:'Photo compteur'},
   {key:'boiteVitesse',label:'Photo boîte de vitesses'},
-  {key:'interieur',label:'Photo intérieur général'}
+  {key:'interieur',label:'Photo intérieur général'},
+  {key:'carteGriseSlot',label:'Photo carte grise'}
 ];
 
 function appliquerModeDossier(estimVehicule){
@@ -2430,6 +2436,14 @@ function appliquerModeDossier(estimVehicule){
   document.querySelectorAll('.veh-only').forEach(function(el){el.style.display=estimVehicule?'':'none';});
   var zone=document.getElementById('zone-vehicule');
   if(zone)zone.style.display=estimVehicule?'block':'none';
+}
+
+function updatePremiereMainBadge(){
+  var a=document.getElementById('veh-date-circulation');
+  var b=document.getElementById('veh-date-immatriculation');
+  var wrap=document.getElementById('veh-premiere-main-wrap');
+  if(!a||!b||!wrap)return;
+  wrap.style.display=(a.value&&b.value&&a.value===b.value)?'':'none';
 }
 
 function getVehicule(){
@@ -2762,6 +2776,9 @@ async function exportEstimationVehiculePDF(){
   ligneInfo('Marque',veh.marque,'Modèle',veh.modele);
   ligneInfo('Immatriculation',veh.immat,'1ère MEC',fd2(veh.dateCirculation));
   ligneInfo('Date d\'immatriculation',fd2(veh.dateImmatriculation),'','');
+  if(veh.dateCirculation&&veh.dateImmatriculation&&veh.dateCirculation===veh.dateImmatriculation){
+    ligneInfo('Première main','Oui','','');
+  }
   ligneInfo('Nb portes',veh.portes,'Énergie',veh.energie);
   ligneInfo('Couleur',veh.couleur,'Kilométrage',veh.kms?veh.kms+' km':'');
   ligneInfo('Boîte',veh.boite,'Nb sièges',veh.sieges);
@@ -3029,6 +3046,7 @@ function ouvrirDossier(id){
       var el=document.getElementById(mapVeh[k]);
       if(el)el.value=veh[k]!=null?veh[k]:'';
     });
+    updatePremiereMainBadge();
     var elFiche=document.getElementById('veh-fiche-identif');if(elFiche)elFiche.checked=!!veh.ficheIdentif;
     var elCarte=document.getElementById('veh-carte-grise');if(elCarte)elCarte.checked=!!veh.carteGrise;
     var elAbandon=document.getElementById('veh-proposer-abandon');if(elAbandon)elAbandon.checked=!!veh.proposerAbandon;
