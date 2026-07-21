@@ -2777,10 +2777,8 @@ async function exportEstimationVehiculePDF(){
   sousTitre('VÉHICULE');
   ligneInfo('Marque',veh.marque,'Modèle',veh.modele);
   ligneInfo('Immatriculation',veh.immat,'1ère MEC',fd2(veh.dateCirculation));
-  ligneInfo('Date d\'immatriculation',fd2(veh.dateImmatriculation),'','');
-  if(veh.dateCirculation&&veh.dateImmatriculation&&veh.dateCirculation===veh.dateImmatriculation){
-    ligneInfo('Première main','Oui','','');
-  }
+  var premiereMain=(veh.dateCirculation&&veh.dateImmatriculation&&veh.dateCirculation===veh.dateImmatriculation)?'Oui':'Non';
+  ligneInfo('Date d\'immatriculation',fd2(veh.dateImmatriculation),'Première main',premiereMain);
   ligneInfo('Nb portes',veh.portes,'Énergie',veh.energie);
   ligneInfo('Couleur',veh.couleur,'Kilométrage',veh.kms?veh.kms+' km':'');
   ligneInfo('Boîte',veh.boite,'Nb sièges',veh.sieges);
