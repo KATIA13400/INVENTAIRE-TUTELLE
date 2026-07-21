@@ -3003,8 +3003,13 @@ function ouvrirDossier(id){
   var rowsToLoad = d.rows||[];
 
   // Charger toutes les lignes d\'un coup sans renderRows intermédiaire
+  // IMPORTANT : on réutilise l'id d'origine de chaque ligne (celui déjà utilisé
+  // comme clé des photos dans Firebase, photometa/{dossierId}/{rowId}/...).
+  // Le régénérer séquentiellement à chaque ouverture désynchronisait les photos
+  // dès qu'une ligne était insérée/supprimée au milieu du tableau.
   rowsToLoad.forEach(function(r){
-    var newId=++rowId;
+    var newId = (r.id!=null && !isNaN(parseInt(r.id))) ? parseInt(r.id) : ++rowId;
+    if(newId > rowId) rowId = newId;
     var row={id:newId,desig:r.desig||'',lieu:r.lieu||'',bas:r.bas||'',haut:r.haut||'',memo:r.memo||false};
     rows.push(row);
   });
