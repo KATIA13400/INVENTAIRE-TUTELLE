@@ -1576,7 +1576,16 @@ async function exportPDF(){
   y+=46;
 
   // ── ANNEXE PHOTOS ────────────────────────────────────────────────────────
-  const pts=photos.filter(p=>p.src).sort((a,b)=>(a.lineNum||999)-(b.lineNum||999));
+  // Les photos par ligne sont indexées par l'id stable de la ligne (utilisé
+  // comme clé dans Firebase), qui ne correspond plus forcément à sa position
+  // visuelle actuelle si une ligne a été insérée/supprimée au milieu du
+  // tableau depuis. On recalcule ici le numéro affiché (N°) à jour.
+  const rowPosById={};
+  rows.forEach((r,i)=>{rowPosById[r.id]=i+1;});
+  const pts=photos.filter(p=>p.src).map(p=>{
+    if(p.rowId!=null && rowPosById[p.rowId]!=null) return Object.assign({},p,{lineNum:rowPosById[p.rowId]});
+    return p;
+  }).sort((a,b)=>(a.lineNum||999)-(b.lineNum||999));
   if(pts.length>0){
     doc.addPage();let py=16;
     fill(TC1);doc.rect(MG,py,CW,9,'F');
