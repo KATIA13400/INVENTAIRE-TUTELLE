@@ -2011,7 +2011,15 @@ function handlePhotoFiles(files){
     reader.readAsDataURL(file);
   });
 }
-function removePhoto(id){photos=photos.filter(p=>p.id!==id);renderGallery();if(currentDossierId)fbSupprimerPhoto(currentDossierId,0,id);}
+function removePhoto(id){
+  const p=photos.find(function(x){return x.id===id;});
+  const rid=(p&&p.rowId!=null)?p.rowId:0;
+  photos=photos.filter(p=>p.id!==id);
+  if(rowPhotos[rid])rowPhotos[rid]=rowPhotos[rid].filter(function(x){return x.id!==id;});
+  renderGallery();
+  renderRows();
+  if(currentDossierId)fbSupprimerPhoto(currentDossierId,rid,id);
+}
 function setPhotoLine(id,val){const p=photos.find(p=>p.id===id);if(p)p.lineNum=parseInt(val)||0;}
 function renderGallery(){
   renderVehiculePhotoSlots();
@@ -3331,10 +3339,18 @@ function syncRowPhotosToGallery(){
   // On reconstruit photos[] à partir de rowPhotos{}
   // En gardant aussi les photos sans ligne
   var orphans = photos.filter(function(p){return !p.rowId;});
+  // rowPhotos est indexé par l'id stable de la ligne (clé Firebase), qui ne
+  // correspond plus forcément à sa position visuelle actuelle une fois
+  // qu'une ligne a été insérée/supprimée au milieu du tableau. Le numéro
+  // affiché (#N, dans la case "Photos") doit refléter la position réelle.
+  var rowPosById={};
+  rows.forEach(function(r,i){rowPosById[r.id]=i+1;});
   var fromRows = [];
   Object.keys(rowPhotos).forEach(function(rid){
+    var ridNum=parseInt(rid);
+    var pos=rowPosById[ridNum]||0;
     (rowPhotos[rid]||[]).forEach(function(p){
-      fromRows.push({id:p.id, src:p.src, lineNum:parseInt(rid), rowId:parseInt(rid), driveFileId:p.driveFileId||null});
+      fromRows.push({id:p.id, src:p.src, lineNum:pos, rowId:ridNum, driveFileId:p.driveFileId||null});
     });
   });
   photos = orphans.concat(fromRows);
