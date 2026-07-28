@@ -352,6 +352,7 @@ function fbEcouter() {
       // Ce dossier vient d'être supprimé depuis un autre onglet/appareil : on
       // ferme la vue immédiatement pour que cet onglet ne le ressuscite pas
       // dans Firebase à la prochaine sauvegarde automatique.
+      arreterEcoutePhotosDossier();
       currentDossierId=null;
       rows=[];rowId=0;photos=[];rowPhotos={};
       document.getElementById('badge-dossier-actif').style.display='none';
@@ -1930,6 +1931,7 @@ function renderRows(){
 
 function clearDossier(){
   if(currentDossierId)sauverDossierEnCours();
+  arreterEcoutePhotosDossier();
   rows=[];rowId=0;photos=[];rowPhotos={};
   currentDossierId=null;
   document.getElementById('badge-dossier-actif').style.display='none';
@@ -2991,7 +2993,8 @@ function ouvrirDossier(id){
   currentDossierId=id;
   const d=allDossiers[id];
   if(!d)return;
-  
+  demarrerEcoutePhotosDossier(id);
+
   // Charger les infos dans le formulaire
   const h=d.h||{};
   const map={dosNum:'dos-num',dosType:'dos-type',dosDate:'dos-date',dosHeure:'dos-heure',
@@ -3098,6 +3101,7 @@ function supprimerDossier(id){
   delete allDossiers[id];
   fbSupprimer(id);
   if(currentDossierId===id){
+    arreterEcoutePhotosDossier();
     currentDossierId=null;
     rows=[];rowId=0;photos=[];rowPhotos={};
     document.getElementById('badge-dossier-actif').style.display='none';
@@ -3607,6 +3611,56 @@ async function fbChargerPhotos(dossierId,callback){
     idsDejaCharges[meta.id]=true;
   });
   if(callback)callback(loaded);
+}
+
+// ── ÉCOUTE TEMPS RÉEL DES PHOTOS DU DOSSIER OUVERT ───────────────────────
+// fbChargerPhotos ne récupère qu'un instantané au moment de l'ouverture :
+// si quelqu'un d'autre ajoute une photo PENDANT que ce dossier reste ouvert
+// ici, elle n'apparaissait jamais sans fermer/rouvrir. On écoute désormais
+// en direct photometa/{dossierId} pour la refléter immédiatement.
+var _photoListenerRef=null;
+var _photoListenerDossierId=null;
+async function chargerUnePhotoDepuisMeta(dossierId,rowId,photoId,meta){
+  if(!meta)return;
+  var idbKey='photo_'+dossierId+'_'+rowId+'_'+photoId;
+  var cached=await idbGet(idbKey);
+  var src=cached?cached.src:null;
+  if(!src&&meta.driveFileId&&gdriveAccessToken){
+    try{
+      var r=await fetch('https://www.googleapis.com/drive/v3/files/'+meta.driveFileId+'?alt=media',{headers:{'Authorization':'Bearer '+gdriveAccessToken}});
+      if(r.ok){
+        var b=await r.blob();
+        src=await new Promise(function(res){var fr=new FileReader();fr.onload=function(){res(fr.result);};fr.readAsDataURL(b);});
+        await idbSet(idbKey,{meta:meta,src:src});
+      }
+    }catch(e){}
+  }
+  if(!src)return;
+  var rid=String(rowId);
+  if(!rowPhotos[rid])rowPhotos[rid]=[];
+  if(rowPhotos[rid].some(function(p){return p.id===photoId;}))return;
+  rowPhotos[rid].push({id:photoId,src:src,label:meta.label||'',driveFileId:meta.driveFileId||null});
+  renderRows();
+  syncRowPhotosToGallery();
+}
+function demarrerEcoutePhotosDossier(dossierId){
+  arreterEcoutePhotosDossier();
+  if(!dossierId)return;
+  _photoListenerDossierId=dossierId;
+  _photoListenerRef=fbdb.ref('photometa/'+dossierId);
+  var handler=function(snap){
+    if(dossierId!==currentDossierId)return;
+    var rowId=snap.key;
+    var metas=snap.val()||{};
+    Object.keys(metas).forEach(function(photoId){
+      chargerUnePhotoDepuisMeta(dossierId,rowId,photoId,metas[photoId]);
+    });
+  };
+  _photoListenerRef.on('child_added',handler);
+  _photoListenerRef.on('child_changed',handler);
+}
+function arreterEcoutePhotosDossier(){
+  if(_photoListenerRef){_photoListenerRef.off();_photoListenerRef=null;_photoListenerDossierId=null;}
 }
 
 // ── RESYNCHRONISATION DES PHOTOS RESTÉES LOCALES ─────────────────────────
