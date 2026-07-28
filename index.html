@@ -282,6 +282,8 @@ function fbSauver(dossierId, dossier) {
     envoye: dossier.envoye || false,
     estimVehicule: dossier.estimVehicule || false,
     vehicule: dossier.vehicule || null,
+    mentionAbandon: dossier.mentionAbandon || false,
+    mentionBijoux: dossier.mentionBijoux || false,
     h: dossier.h || {},
     rows: (dossier.rows || []).map(function(r) {
       return {id:r.id, desig:r.desig||'', lieu:r.lieu||'', bas:r.bas||'', haut:r.haut||'', memo:r.memo||false};
@@ -1722,10 +1724,11 @@ function badgeOrHtml(calc){
   return '🟡 Or : '+calc.poids.toLocaleString('fr-FR')+' g → '+calc.bas+'–'+calc.haut+' €';
 }
 
-function toggleMentionBijoux(){
-  mentionBijoux = !mentionBijoux;
+function appliquerMentionBijoux(state){
+  mentionBijoux = state;
   const btn = document.getElementById('btn-bijoux');
   const bloc = document.getElementById('bijoux-bloc');
+  if(!btn||!bloc)return;
   if(mentionBijoux){
     btn.style.background='var(--tc1)';btn.style.color='#fff';btn.style.borderColor='var(--tc1)';
     bloc.style.display='block';
@@ -1734,15 +1737,20 @@ function toggleMentionBijoux(){
     bloc.style.display='none';
   }
 }
+function toggleMentionBijoux(){
+  appliquerMentionBijoux(!mentionBijoux);
+  autosave();
+}
 
 // ── MENTION ABANDON ──────────────────────────────────────────────────────────
 let mentionAbandon = false;
 const TEXTE_ABANDON = "Compte tenu de la faible valeur vénale des biens meubles garnissant le logement du protégé, il y aurait lieu de faire abandon de ces éléments. En effet, les frais de vente, de transport et de publicité seraient supérieurs au produit de la vente, rendant celle-ci déficitaire. Pour servir et faire valoir ce que de droit.";
 
-function toggleMentionAbandon(){
-  mentionAbandon = !mentionAbandon;
+function appliquerMentionAbandon(state){
+  mentionAbandon = state;
   const btn = document.getElementById('btn-abandon');
   const bloc = document.getElementById('abandon-bloc');
+  if(!btn||!bloc)return;
   if(mentionAbandon){
     btn.style.background='var(--tc1)';btn.style.color='#fff';btn.style.borderColor='var(--tc1)';
     bloc.style.display='block';
@@ -1750,6 +1758,10 @@ function toggleMentionAbandon(){
     btn.style.background='';btn.style.color='';btn.style.borderColor='';
     bloc.style.display='none';
   }
+}
+function toggleMentionAbandon(){
+  appliquerMentionAbandon(!mentionAbandon);
+  autosave();
 }
 
 
@@ -1932,6 +1944,8 @@ function renderRows(){
 function clearDossier(){
   if(currentDossierId)sauverDossierEnCours();
   arreterEcoutePhotosDossier();
+  appliquerMentionAbandon(false);
+  appliquerMentionBijoux(false);
   rows=[];rowId=0;photos=[];rowPhotos={};
   currentDossierId=null;
   document.getElementById('badge-dossier-actif').style.display='none';
@@ -3002,6 +3016,8 @@ function ouvrirDossier(id){
   const d=allDossiers[id];
   if(!d)return;
   demarrerEcoutePhotosDossier(id);
+  appliquerMentionAbandon(!!d.mentionAbandon);
+  appliquerMentionBijoux(!!d.mentionBijoux);
 
   // Charger les infos dans le formulaire
   const h=d.h||{};
@@ -3095,7 +3111,7 @@ function sauverDossierEnCours(){
   // Les photos restent disponibles pendant la session uniquement
   allDossiers[currentDossierId]={
     ...allDossiers[currentDossierId],
-    h,rows,vehicule,
+    h,rows,vehicule,mentionAbandon,mentionBijoux,
     dateMaj:Date.now()
   };
   sauverTousDossiers();
@@ -3110,6 +3126,8 @@ function supprimerDossier(id){
   fbSupprimer(id);
   if(currentDossierId===id){
     arreterEcoutePhotosDossier();
+    appliquerMentionAbandon(false);
+    appliquerMentionBijoux(false);
     currentDossierId=null;
     rows=[];rowId=0;photos=[];rowPhotos={};
     document.getElementById('badge-dossier-actif').style.display='none';
