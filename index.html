@@ -1920,7 +1920,7 @@ function renderRows(){
     el.addEventListener('change',e=>{
       const id=parseInt(e.target.dataset.id),checked=e.target.checked;
       updateRow(id,'memo',checked);
-      e.target.closest('tr').querySelectorAll('input[type="number"]').forEach(n=>{n.disabled=checked;if(checked)n.value='';});
+      e.target.closest('tr').querySelectorAll('input[data-f="bas"],input[data-f="haut"]').forEach(n=>{n.disabled=checked;if(checked)n.value='';});
       const r=rows.find(r=>r.id===id);if(r&&checked){r.bas='';r.haut='';}
     });
   });
