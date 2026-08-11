@@ -992,6 +992,7 @@ function updateDriveStatus(){
       </div>
       <div class="fg"><label>Nombre de sièges</label><input type="number" id="veh-sieges" min="0" step="1"/></div>
       <div class="fg"><label>Estimation réalisée par</label><input id="veh-realise-par" placeholder="Maître Katia FAGIANO"/></div>
+      <div class="fg" style="grid-column:1/-1"><label>Localisation du véhicule</label><input id="veh-localisation" placeholder="Laisser vide pour reprendre l'adresse du protégé"/></div>
     </div>
   </div>
 
@@ -2428,7 +2429,7 @@ function ouvrirModalNouveauDossier(estimVehicule){
 
 function vehiculeParDefaut(){
   return {marque:'',modele:'',immat:'',dateCirculation:'',dateImmatriculation:'',portes:'',energie:'',couleur:'',
-    kms:'',boite:'',sieges:'',realisePar:'',equipements:{},etat:'',ficheIdentif:false,carteGrise:false,
+    kms:'',boite:'',sieges:'',realisePar:'',localisation:'',equipements:{},etat:'',ficheIdentif:false,carteGrise:false,
     remarques:'',descriptionEtat:'',proposerAbandon:false,mentionVente:false,estimation:'',
     dommages:[],typeSchema:'voiture'};
 }
@@ -2494,7 +2495,7 @@ function getVehicule(){
     marque:v('veh-marque'),modele:v('veh-modele'),immat:v('veh-immat'),
     dateCirculation:v('veh-date-circulation'),dateImmatriculation:v('veh-date-immatriculation'),portes:v('veh-portes'),
     energie:v('veh-energie'),couleur:v('veh-couleur'),kms:v('veh-kms'),boite:v('veh-boite'),
-    sieges:v('veh-sieges'),realisePar:v('veh-realise-par'),equipements:equipements,
+    sieges:v('veh-sieges'),realisePar:v('veh-realise-par'),localisation:v('veh-localisation'),equipements:equipements,
     etat:(d.vehicule&&d.vehicule.etat)||'',
     ficheIdentif:document.getElementById('veh-fiche-identif')?document.getElementById('veh-fiche-identif').checked:false,
     carteGrise:document.getElementById('veh-carte-grise')?document.getElementById('veh-carte-grise').checked:false,
@@ -2816,7 +2817,7 @@ async function exportEstimationVehiculePDF(){
   ligneInfo('Nb portes',veh.portes,'Énergie',veh.energie);
   ligneInfo('Couleur',veh.couleur,'Kilométrage',veh.kms?veh.kms+' km':'');
   ligneInfo('Boîte',veh.boite,'Nb sièges',veh.sieges);
-  ligneInfo('Localisation véhicule',h.dosAdresse,'','');
+  ligneInfo('Localisation véhicule',veh.localisation||h.dosAdresse,'','');
   ligneInfo('État du véhicule',veh.descriptionEtat,'','');
   y+=6;
 
@@ -3066,7 +3067,7 @@ function ouvrirDossier(id){
     var mapVeh={marque:'veh-marque',modele:'veh-modele',immat:'veh-immat',dateCirculation:'veh-date-circulation',
       dateImmatriculation:'veh-date-immatriculation',
       portes:'veh-portes',energie:'veh-energie',couleur:'veh-couleur',kms:'veh-kms',boite:'veh-boite',sieges:'veh-sieges',
-      realisePar:'veh-realise-par',remarques:'veh-remarques',descriptionEtat:'veh-description-etat',estimation:'veh-estimation'};
+      realisePar:'veh-realise-par',localisation:'veh-localisation',remarques:'veh-remarques',descriptionEtat:'veh-description-etat',estimation:'veh-estimation'};
     Object.keys(mapVeh).forEach(function(k){
       var el=document.getElementById(mapVeh[k]);
       if(el)el.value=veh[k]!=null?veh[k]:'';
