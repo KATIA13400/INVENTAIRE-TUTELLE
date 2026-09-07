@@ -2007,6 +2007,10 @@ function handlePhotoFiles(files){
     reader.onload=ev=>{
       // Compresser à max 800px et qualité 0.6 pour économiser l'espace
       compressImage(ev.target.result, 600, 0.5, compressed=>{
+        // Filet anti-doublon : ignore silencieusement une photo strictement
+        // identique déjà présente dans la galerie générale de ce dossier
+        // (ex : double sélection accidentelle du même fichier).
+        if(photos.some(function(p){return !p.rowId&&p.src===compressed;}))return;
         var photoId=Date.now()+"_"+Math.floor(Math.random()*100000);
         photos.push({id:photoId,src:compressed,lineNum:0});
         renderGallery();
@@ -2204,8 +2208,10 @@ function injecterDansLigne(){
   if(expImages.length>0){
     if(!rowPhotos[r.id])rowPhotos[r.id]=[];
     expImages.forEach(function(img){
-      var photoId=Date.now()+"_"+Math.floor(Math.random()*100000);
       var src='data:image/jpeg;base64,'+img.b64.split(',')[1];
+      // Filet anti-doublon : évite de réinjecter deux fois la même photo sur cette ligne
+      if(rowPhotos[r.id].some(function(p){return p.src===src;}))return;
+      var photoId=Date.now()+"_"+Math.floor(Math.random()*100000);
       var label=img.label||'Photo expertise';
       rowPhotos[r.id].push({id:photoId,src:src,label:label});
       if(currentDossierId)fbSauverPhoto(currentDossierId,r.id,photoId,src,label);
@@ -3297,6 +3303,11 @@ function mrpHandleFiles(files){
     reader.onload = function(ev){
       compressImage(ev.target.result, 800, 0.65, function(compressed){
         if(!rowPhotos[_mrpCurrentRowId]) rowPhotos[_mrpCurrentRowId]=[];
+        // Filet anti-doublon : ignore silencieusement une photo strictement
+        // identique déjà présente sur cette ligne (ex : double sélection
+        // accidentelle du même fichier, ou nouvelle tentative après un
+        // envoi qui avait en réalité déjà réussi).
+        if(rowPhotos[_mrpCurrentRowId].some(function(p){return p.src===compressed;}))return;
         var photoId = Date.now() + "_" + Math.floor(Math.random()*100000);
         var photoLabel = file.name.replace(/\.[^.]+$/,'');
         rowPhotos[_mrpCurrentRowId].push({
@@ -3388,7 +3399,14 @@ function syncRowPhotosToGallery(){
 async function nettoyerPhotosDupliqueesDossier(){
   if(!currentDossierId){alert('Aucun dossier ouvert.');return;}
   if(!confirm('Rechercher les photos strictement identiques en double dans ce dossier et ne garder qu\'un exemplaire de chacune ?'))return;
-
+  try{
+    await _nettoyerPhotosDupliqueesDossierInterne();
+  }catch(e){
+    console.error('Nettoyage doublons :',e);
+    alert('Erreur pendant le nettoyage : '+(e&&e.message?e.message:e)+'\n\nMerci de faire une capture de ce message.');
+  }
+}
+async function _nettoyerPhotosDupliqueesDossierInterne(){
   function dedupliquer(liste){
     // Trie par id croissant (l'id étant basé sur l'horodatage de création) pour garder la plus ancienne copie
     var triee=liste.slice().sort(function(a,b){return String(a.id).localeCompare(String(b.id));});
