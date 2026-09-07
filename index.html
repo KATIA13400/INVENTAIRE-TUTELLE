@@ -1126,7 +1126,10 @@ function updateDriveStatus(){
 
 <!-- PHOTOS -->
 <div class="card">
-  <div class="section-label"><i class="ti ti-camera" style="font-size:14px"></i>Photos — associées aux numéros de ligne <span style="font-size:10px;font-weight:400;color:var(--tc3);margin-left:8px"><i class="ti ti-info-circle"></i> Disponibles pendant la session — intégrées dans le PDF</span></div>
+  <div class="section-label" style="justify-content:space-between">
+    <span><i class="ti ti-camera" style="font-size:14px"></i>Photos — associées aux numéros de ligne <span style="font-size:10px;font-weight:400;color:var(--tc3);margin-left:8px"><i class="ti ti-info-circle"></i> Disponibles pendant la session — intégrées dans le PDF</span></span>
+    <button class="btn" style="font-size:11px;padding:3px 8px" onclick="nettoyerPhotosDupliqueesDossier()" title="Repère les photos strictement identiques dans ce dossier et ne garde qu'un exemplaire"><i class="ti ti-wand" style="font-size:12px"></i> Nettoyer les doublons</button>
+  </div>
   <div class="photo-drop" id="photo-drop" onclick="document.getElementById('photo-input').click()" ondragover="event.preventDefault();event.stopPropagation();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handlePhotoDrop(event)">
     <i class="ti ti-photo-plus" style="font-size:22px;color:var(--text2)"></i>
     <p>Cliquer ou déposer des photos — sélection multiple possible</p>
@@ -3250,6 +3253,7 @@ document.addEventListener('keydown',function(e){
     <input type="file" id="mrp-file-input" accept="image/*" multiple capture="environment" style="display:none" onchange="mrpHandleFiles(this.files)"/>
     <div class="mrp-grid" id="mrp-grid"></div>
     <div class="mrp-actions">
+      <button class="btn" onclick="nettoyerPhotosDupliqueesDossier()" title="Repère les photos strictement identiques dans ce dossier et ne garde qu'un exemplaire"><i class="ti ti-wand" style="font-size:12px"></i> Nettoyer les doublons</button>
       <button class="btn" onclick="fermerPhotosLigne()">Fermer</button>
     </div>
   </div>
@@ -3373,6 +3377,56 @@ function syncRowPhotosToGallery(){
   });
   photos = orphans.concat(fromRows);
   renderGallery();
+}
+
+// ── NETTOYAGE DES PHOTOS EN DOUBLE ────────────────────────────────────────
+// Repère, dans le dossier ouvert, les photos strictement identiques (même
+// contenu image) présentes plusieurs fois sous la même ligne (ou dans la
+// galerie générale), et ne garde que la plus ancienne. Se base sur une
+// comparaison exacte du contenu (src) : deux photos réellement différentes
+// (même si elles se ressemblent visuellement) ne sont jamais confondues.
+async function nettoyerPhotosDupliqueesDossier(){
+  if(!currentDossierId){alert('Aucun dossier ouvert.');return;}
+  if(!confirm('Rechercher les photos strictement identiques en double dans ce dossier et ne garder qu\'un exemplaire de chacune ?'))return;
+
+  function dedupliquer(liste){
+    // Trie par id croissant (l'id étant basé sur l'horodatage de création) pour garder la plus ancienne copie
+    var triee=liste.slice().sort(function(a,b){return String(a.id).localeCompare(String(b.id));});
+    var vus={},aGarder=[],aSupprimer=[];
+    triee.forEach(function(p){
+      if(vus[p.src]){aSupprimer.push(p);}
+      else{vus[p.src]=true;aGarder.push(p);}
+    });
+    return {aGarder:aGarder,aSupprimer:aSupprimer};
+  }
+
+  var totalSupprimees=0;
+
+  // Photos de la galerie générale (sans ligne associée)
+  var orphans=photos.filter(function(p){return !p.rowId;});
+  var resOrphans=dedupliquer(orphans);
+  for(var i=0;i<resOrphans.aSupprimer.length;i++){
+    await fbSupprimerPhoto(currentDossierId,0,resOrphans.aSupprimer[i].id);
+    totalSupprimees++;
+  }
+  var idsOrphansASupprimer={};
+  resOrphans.aSupprimer.forEach(function(p){idsOrphansASupprimer[p.id]=true;});
+  photos=photos.filter(function(p){return p.rowId||!idsOrphansASupprimer[p.id];});
+
+  // Photos associées à une ligne
+  for(var rid in rowPhotos){
+    var res=dedupliquer(rowPhotos[rid]||[]);
+    for(var j=0;j<res.aSupprimer.length;j++){
+      await fbSupprimerPhoto(currentDossierId,rid,res.aSupprimer[j].id);
+      totalSupprimees++;
+    }
+    rowPhotos[rid]=res.aGarder;
+  }
+
+  mrpRenderGrid();
+  renderRows();
+  syncRowPhotosToGallery();
+  alert(totalSupprimees>0?(totalSupprimees+' photo(s) en double supprimée(s).'):'Aucun doublon trouvé dans ce dossier.');
 }
 </script>
 
