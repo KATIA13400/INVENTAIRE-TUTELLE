@@ -3396,33 +3396,60 @@ function syncRowPhotosToGallery(){
 // galerie générale), et ne garde que la plus ancienne. Se base sur une
 // comparaison exacte du contenu (src) : deux photos réellement différentes
 // (même si elles se ressemblent visuellement) ne sont jamais confondues.
+// Une entrée dont le contenu n'a pas (ou plus) une forme d'image valide ne
+// doit JAMAIS être comparée aux autres : sans ce garde-fou, plusieurs photos
+// dont le contenu n'a simplement pas encore fini de charger (src vide/absent)
+// se retrouvent avec la même valeur "manquante" et sont alors toutes prises
+// pour des doublons les unes des autres, même si ce sont des photos
+// différentes — avec un risque de suppression en masse. Un vrai contenu
+// d'image (JPEG en base64) fait toujours plusieurs milliers de caractères.
+function _photoContenuValide(p){
+  return typeof p.src==='string' && p.src.length>1000 && p.src.indexOf('data:image')===0;
+}
+function _grouperDoublons(liste){
+  var valides=liste.filter(_photoContenuValide);
+  var invalides=liste.filter(function(p){return !_photoContenuValide(p);});
+  // Trie par id croissant (l'id étant basé sur l'horodatage de création) pour garder la plus ancienne copie
+  var triee=valides.slice().sort(function(a,b){return String(a.id).localeCompare(String(b.id));});
+  var vus={},aGarder=[],aSupprimer=[];
+  triee.forEach(function(p){
+    if(vus[p.src]){aSupprimer.push(p);}
+    else{vus[p.src]=true;aGarder.push(p);}
+  });
+  // Les entrées au contenu non chargé/invalide ne sont jamais des candidates
+  // à la suppression : on les garde telles quelles, par précaution.
+  return {aGarder:aGarder.concat(invalides),aSupprimer:aSupprimer};
+}
+function _calculerDoublonsDossier(){
+  var plan={orphans:null,parLigne:{},totalASupprimer:0,exemples:[]};
+  var orphans=photos.filter(function(p){return !p.rowId;});
+  plan.orphans=_grouperDoublons(orphans);
+  plan.totalASupprimer+=plan.orphans.aSupprimer.length;
+  for(var rid in rowPhotos){
+    var res=_grouperDoublons(rowPhotos[rid]||[]);
+    plan.parLigne[rid]=res;
+    plan.totalASupprimer+=res.aSupprimer.length;
+  }
+  return plan;
+}
 async function nettoyerPhotosDupliqueesDossier(){
   if(!currentDossierId){alert('Aucun dossier ouvert.');return;}
-  if(!confirm('Rechercher les photos strictement identiques en double dans ce dossier et ne garder qu\'un exemplaire de chacune ?'))return;
   try{
-    await _nettoyerPhotosDupliqueesDossierInterne();
+    var plan=_calculerDoublonsDossier();
+    if(plan.totalASupprimer===0){alert('Aucun doublon trouvé dans ce dossier.');return;}
+    var ok=confirm(plan.totalASupprimer+' photo(s) identifiée(s) comme doublons STRICTEMENT identiques dans ce dossier.\n\nElles seront supprimées définitivement (Firebase + cache local), en ne gardant qu\'un exemplaire de chacune.\n\nConfirmer la suppression ?');
+    if(!ok)return;
+    await _appliquerSuppressionDoublons(plan);
   }catch(e){
     console.error('Nettoyage doublons :',e);
     alert('Erreur pendant le nettoyage : '+(e&&e.message?e.message:e)+'\n\nMerci de faire une capture de ce message.');
   }
 }
-async function _nettoyerPhotosDupliqueesDossierInterne(){
-  function dedupliquer(liste){
-    // Trie par id croissant (l'id étant basé sur l'horodatage de création) pour garder la plus ancienne copie
-    var triee=liste.slice().sort(function(a,b){return String(a.id).localeCompare(String(b.id));});
-    var vus={},aGarder=[],aSupprimer=[];
-    triee.forEach(function(p){
-      if(vus[p.src]){aSupprimer.push(p);}
-      else{vus[p.src]=true;aGarder.push(p);}
-    });
-    return {aGarder:aGarder,aSupprimer:aSupprimer};
-  }
-
+async function _appliquerSuppressionDoublons(plan){
   var totalSupprimees=0;
 
   // Photos de la galerie générale (sans ligne associée)
-  var orphans=photos.filter(function(p){return !p.rowId;});
-  var resOrphans=dedupliquer(orphans);
+  var resOrphans=plan.orphans;
   for(var i=0;i<resOrphans.aSupprimer.length;i++){
     await fbSupprimerPhoto(currentDossierId,0,resOrphans.aSupprimer[i].id);
     totalSupprimees++;
@@ -3432,8 +3459,8 @@ async function _nettoyerPhotosDupliqueesDossierInterne(){
   photos=photos.filter(function(p){return p.rowId||!idsOrphansASupprimer[p.id];});
 
   // Photos associées à une ligne
-  for(var rid in rowPhotos){
-    var res=dedupliquer(rowPhotos[rid]||[]);
+  for(var rid in plan.parLigne){
+    var res=plan.parLigne[rid];
     for(var j=0;j<res.aSupprimer.length;j++){
       await fbSupprimerPhoto(currentDossierId,rid,res.aSupprimer[j].id);
       totalSupprimees++;
