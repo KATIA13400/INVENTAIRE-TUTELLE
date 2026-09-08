@@ -1128,7 +1128,10 @@ function updateDriveStatus(){
 <div class="card">
   <div class="section-label" style="justify-content:space-between">
     <span><i class="ti ti-camera" style="font-size:14px"></i>Photos — associées aux numéros de ligne <span style="font-size:10px;font-weight:400;color:var(--tc3);margin-left:8px"><i class="ti ti-info-circle"></i> Disponibles pendant la session — intégrées dans le PDF</span></span>
-    <button class="btn" style="font-size:11px;padding:3px 8px" onclick="nettoyerPhotosDupliqueesDossier()" title="Repère les photos strictement identiques dans ce dossier et ne garde qu'un exemplaire"><i class="ti ti-wand" style="font-size:12px"></i> Nettoyer les doublons</button>
+    <span style="display:flex;gap:6px">
+      <button class="btn" style="font-size:11px;padding:3px 8px;background:#e8f4ea;border-color:#4a9a5a;color:#2a6a3a" onclick="restaurerPhotosDepuisCacheLocal()" title="Renvoie vers le serveur les photos de ce dossier encore présentes dans le cache de CET appareil (n'efface jamais rien)"><i class="ti ti-download" style="font-size:12px"></i> Restaurer depuis le cache local</button>
+      <button class="btn" style="font-size:11px;padding:3px 8px" onclick="nettoyerPhotosDupliqueesDossier()" title="Repère les photos strictement identiques dans ce dossier et ne garde qu'un exemplaire"><i class="ti ti-wand" style="font-size:12px"></i> Nettoyer les doublons</button>
+    </span>
   </div>
   <div class="photo-drop" id="photo-drop" onclick="document.getElementById('photo-input').click()" ondragover="event.preventDefault();event.stopPropagation();this.classList.add('drag')" ondragleave="this.classList.remove('drag')" ondrop="handlePhotoDrop(event)">
     <i class="ti ti-photo-plus" style="font-size:22px;color:var(--text2)"></i>
@@ -3388,6 +3391,33 @@ function syncRowPhotosToGallery(){
   });
   photos = orphans.concat(fromRows);
   renderGallery();
+}
+
+// ── RESTAURATION DEPUIS LE CACHE LOCAL ────────────────────────────────────
+// Renvoie vers Firebase toutes les photos du dossier ouvert encore présentes
+// dans le cache IndexedDB de CET appareil, sans jamais rien effacer. Sert de
+// filet de secours si des photos ont disparu du serveur (ex : suppression
+// accidentelle ailleurs) mais que cet appareil les a encore en cache local.
+async function restaurerPhotosDepuisCacheLocal(){
+  if(!currentDossierId){alert('Aucun dossier ouvert.');return;}
+  if(!confirm('Cette action va renvoyer vers le serveur toutes les photos de ce dossier encore présentes dans le cache de CET appareil. Elle n\'efface jamais rien.\n\nContinuer ?'))return;
+  try{
+    var prefix='photo_'+currentDossierId+'_';
+    var entries=await idbGetAllByPrefix(prefix);
+    var restaurees=0;
+    for(var i=0;i<entries.length;i++){
+      var meta=entries[i].value&&entries[i].value.meta;
+      var src=entries[i].value&&entries[i].value.src;
+      if(!meta||!_photoContenuValide({src:src}))continue;
+      await fbdb.ref('photometa/'+currentDossierId+'/'+meta.rowId+'/'+meta.id).set(Object.assign({},meta,{src:src}));
+      restaurees++;
+    }
+    if(restaurees===0){alert('Aucune photo de ce dossier trouvée dans le cache de cet appareil.');return;}
+    alert(restaurees+' photo(s) renvoyée(s) vers le serveur depuis le cache de cet appareil.\n\nFermez ce dossier puis rouvrez-le pour les revoir toutes.');
+  }catch(e){
+    console.error('Restauration photos :',e);
+    alert('Erreur pendant la restauration : '+(e&&e.message?e.message:e));
+  }
 }
 
 // ── NETTOYAGE DES PHOTOS EN DOUBLE ────────────────────────────────────────
