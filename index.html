@@ -1130,6 +1130,7 @@ function updateDriveStatus(){
     <span><i class="ti ti-camera" style="font-size:14px"></i>Photos — associées aux numéros de ligne <span style="font-size:10px;font-weight:400;color:var(--tc3);margin-left:8px"><i class="ti ti-info-circle"></i> Disponibles pendant la session — intégrées dans le PDF</span></span>
     <span style="display:flex;gap:6px">
       <button class="btn" style="font-size:11px;padding:3px 8px;background:#e8f4ea;border-color:#4a9a5a;color:#2a6a3a" onclick="restaurerPhotosDepuisCacheLocal()" title="Renvoie vers le serveur les photos de ce dossier encore présentes dans le cache de CET appareil (n'efface jamais rien)"><i class="ti ti-download" style="font-size:12px"></i> Restaurer depuis le cache local</button>
+      <button class="btn" style="font-size:11px;padding:3px 8px;background:#e8f4ea;border-color:#4a9a5a;color:#2a6a3a" onclick="restaurerPhotosDepuisDriveHistorique()" title="Recherche sur le compte Google Drive connecté d'anciennes photos de ce dossier et les restaure (n'efface jamais rien)"><i class="ti ti-brand-google-drive" style="font-size:12px"></i> Restaurer depuis Drive</button>
       <button class="btn" style="font-size:11px;padding:3px 8px" onclick="nettoyerPhotosDupliqueesDossier()" title="Repère les photos strictement identiques dans ce dossier et ne garde qu'un exemplaire"><i class="ti ti-wand" style="font-size:12px"></i> Nettoyer les doublons</button>
     </span>
   </div>
@@ -3391,6 +3392,52 @@ function syncRowPhotosToGallery(){
   });
   photos = orphans.concat(fromRows);
   renderGallery();
+}
+
+// ── RESTAURATION DEPUIS GOOGLE DRIVE (ancien système, avant migration) ────
+// Avant la migration vers Firebase, chaque photo était envoyée sur Drive
+// sous le nom "dossierId__rowId__photoId.jpg". La suppression d'une photo
+// déjà migrée (qui avait un champ src) n'effaçait PAS le fichier Drive
+// d'origine (l'appareil qui supprime n'a alors plus cette information en
+// cache local). Cet outil recherche, sur le compte Google actuellement
+// connecté, tous les fichiers Drive de ce dossier et les restaure dans
+// Firebase. Ne fonctionne que depuis le compte qui avait initialement
+// envoyé ces photos (scope drive.file oblige).
+async function restaurerPhotosDepuisDriveHistorique(){
+  if(!currentDossierId){alert('Aucun dossier ouvert.');return;}
+  if(!gdriveAccessToken){alert('Connectez d\'abord Google Drive sur cet appareil (bouton "Connecter Drive" en bas de page), puis réessayez.');return;}
+  if(!confirm('Rechercher sur le compte Google Drive connecté ici d\'anciennes photos de ce dossier et les restaurer dans l\'appli ?\n\nÀ tenter depuis CHAQUE compte (le vôtre, puis celui de votre collaboratrice) si le premier ne trouve rien.'))return;
+  try{
+    var q="name contains '"+currentDossierId+"__' and trashed=false";
+    var resp=await fetch('https://www.googleapis.com/drive/v3/files?q='+encodeURIComponent(q)+'&fields=files(id,name)&pageSize=1000',{headers:{'Authorization':'Bearer '+gdriveAccessToken}});
+    var data=await resp.json();
+    var files=data.files||[];
+    if(files.length===0){alert('Aucun fichier trouvé sur CE compte Google Drive pour ce dossier.\n\nEssayez depuis l\'autre compte (vous ou votre collaboratrice) : c\'est peut-être lui/elle qui les avait envoyées.');return;}
+    var restaurees=0;
+    for(var i=0;i<files.length;i++){
+      var f=files[i];
+      // Nom attendu : dossierId__rowId__photoId.jpg
+      var parts=f.name.replace(/\.[a-zA-Z0-9]+$/,'').split('__');
+      if(parts.length<3)continue;
+      var rowId=parts[1],photoId=parts[2];
+      try{
+        var r=await fetch('https://www.googleapis.com/drive/v3/files/'+f.id+'?alt=media',{headers:{'Authorization':'Bearer '+gdriveAccessToken}});
+        if(!r.ok)continue;
+        var b=await r.blob();
+        var src=await new Promise(function(res){var fr=new FileReader();fr.onload=function(){res(fr.result);};fr.readAsDataURL(b);});
+        if(!_photoContenuValide({src:src}))continue;
+        var rowIdVal=isNaN(parseInt(rowId))?rowId:parseInt(rowId);
+        var meta={id:photoId,rowId:rowIdVal,dossierId:currentDossierId,label:'',date:Date.now()};
+        await fbdb.ref('photometa/'+currentDossierId+'/'+rowId+'/'+photoId).set(Object.assign({},meta,{src:src}));
+        await idbSet('photo_'+currentDossierId+'_'+rowId+'_'+photoId,{meta:meta,src:src,synced:true});
+        restaurees++;
+      }catch(e){}
+    }
+    alert(restaurees>0?(restaurees+' photo(s) restaurée(s) depuis Google Drive.\n\nFermez ce dossier puis rouvrez-le pour les revoir toutes.'):'Fichiers trouvés sur Drive mais aucun n\'a pu être restauré.');
+  }catch(e){
+    console.error('Restauration Drive :',e);
+    alert('Erreur pendant la restauration : '+(e&&e.message?e.message:e));
+  }
 }
 
 // ── RESTAURATION DEPUIS LE CACHE LOCAL ────────────────────────────────────
