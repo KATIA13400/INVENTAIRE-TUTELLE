@@ -4188,30 +4188,36 @@ let mandatLotId = 0;
 // donc invisibles d'un compte à l'autre. On les rend partagés en les
 // stockant directement à plat (mandats/{id}) — même chemin Firebase
 // qu'avant (déjà autorisé par les règles de sécurité), juste sans le niveau
-// "par compte". Migration ponctuelle et sans risque au premier chargement de
-// chaque compte : ses anciens mandats (mandats/{uid}/{id}) sont recopiés à
-// plat s'ils n'y sont pas déjà, puis l'ancien sous-nœud "par compte" est
-// supprimé (les mandats eux-mêmes restent intacts, désormais à plat).
-// Un mandat a toujours un id commençant par "mand_" (voir creerNouveauMandat)
-// — ce préfixe sert à ignorer sans risque un éventuel résidu non nettoyé de
+// "par compte". Migration ponctuelle et sans risque au premier chargement,
+// quel que soit le compte qui se connecte : les règles Firebase autorisant
+// désormais les DEUX comptes à lire tout le chemin "mandats", on peut migrer
+// en une fois les anciens mandats des DEUX comptes (pas seulement ceux du
+// compte qui ouvre l'appli). Chaque sous-nœud "par compte" (clé = un uid
+// Firebase) est recopié à plat puis supprimé une fois migré. Un mandat a
+// toujours un id commençant par "mand_" (voir creerNouveauMandat) — ce
+// préfixe distingue sans ambiguïté un vrai mandat d'un résidu non nettoyé de
 // l'ancien format (une clé Firebase uid ne commence jamais par "mand_").
 function chargerMandatsFirebase(){
   if(!fbdb)return;
-  var uid = firebase.auth().currentUser&&firebase.auth().currentUser.uid;
-  if(uid){
-    fbdb.ref('mandats/'+uid).once('value').then(function(snap){
-      var anciens=snap.val();
-      if(!anciens)return;
+  fbdb.ref('mandats').once('value').then(function(snap){
+    var data=snap.val()||{};
+    var anciensUids=Object.keys(data).filter(function(k){return k.indexOf('mand_')!==0;});
+    if(anciensUids.length===0)return;
+    var toutesLesEcritures=[];
+    anciensUids.forEach(function(uid){
+      var anciens=data[uid];
+      if(!anciens||typeof anciens!=='object')return;
       var writes=Object.keys(anciens).map(function(id){
         return fbdb.ref('mandats/'+id).once('value').then(function(existSnap){
           if(!existSnap.exists()) return fbdb.ref('mandats/'+id).set(anciens[id]);
         });
       });
-      Promise.all(writes).then(function(){
-        fbdb.ref('mandats/'+uid).remove().catch(function(){});
-      }).catch(function(){});
-    }).catch(function(){});
-  }
+      toutesLesEcritures.push(Promise.all(writes).then(function(){
+        return fbdb.ref('mandats/'+uid).remove();
+      }));
+    });
+    Promise.all(toutesLesEcritures).catch(function(){});
+  }).catch(function(){});
   fbdb.ref('mandats').on('value',function(snap){
     var data=snap.val()||{};
     var propre={};
