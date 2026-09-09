@@ -4184,11 +4184,28 @@ let mandatLots = [];
 let mandatLotId = 0;
 
 // Charger depuis Firebase
+// Les mandats étaient auparavant stockés par compte (mandats/{uid}), donc
+// invisibles d'un compte à l'autre — exactement le même défaut d'architecture
+// que les photos sur Drive. On les stocke désormais dans un emplacement
+// partagé entre les deux comptes (mandatsPartages/{id}), comme le reste des
+// dossiers. Migration ponctuelle et sans risque : au premier chargement de
+// chaque compte, ses anciens mandats (mandats/{uid}) sont recopiés vers
+// l'emplacement partagé s'ils n'y sont pas déjà.
 function chargerMandatsFirebase(){
   if(!fbdb)return;
   var uid = firebase.auth().currentUser&&firebase.auth().currentUser.uid;
-  if(!uid)return;
-  fbdb.ref('mandats/'+uid).on('value',function(snap){
+  if(uid){
+    fbdb.ref('mandats/'+uid).once('value').then(function(snap){
+      var anciens=snap.val();
+      if(!anciens)return;
+      Object.keys(anciens).forEach(function(id){
+        fbdb.ref('mandatsPartages/'+id).once('value').then(function(existSnap){
+          if(!existSnap.exists()) fbdb.ref('mandatsPartages/'+id).set(anciens[id]);
+        });
+      });
+    }).catch(function(){});
+  }
+  fbdb.ref('mandatsPartages').on('value',function(snap){
     allMandats = snap.val()||{};
     renderListeMandats();
   });
@@ -4196,16 +4213,12 @@ function chargerMandatsFirebase(){
 
 function sauverMandatFirebase(id){
   if(!fbdb||!id)return;
-  var uid = firebase.auth().currentUser&&firebase.auth().currentUser.uid;
-  if(!uid)return;
-  fbdb.ref('mandats/'+uid+'/'+id).set(allMandats[id]);
+  fbdb.ref('mandatsPartages/'+id).set(allMandats[id]);
 }
 
 function supprimerMandatFirebase(id){
   if(!fbdb||!id)return;
-  var uid = firebase.auth().currentUser&&firebase.auth().currentUser.uid;
-  if(!uid)return;
-  fbdb.ref('mandats/'+uid+'/'+id).remove();
+  fbdb.ref('mandatsPartages/'+id).remove();
 }
 
 // ── LISTE MANDATS ────────────────────────────────────────
