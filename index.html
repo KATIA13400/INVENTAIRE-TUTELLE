@@ -4184,13 +4184,17 @@ let mandatLots = [];
 let mandatLotId = 0;
 
 // Charger depuis Firebase
-// Les mandats étaient auparavant stockés par compte (mandats/{uid}), donc
-// invisibles d'un compte à l'autre — exactement le même défaut d'architecture
-// que les photos sur Drive. On les stocke désormais dans un emplacement
-// partagé entre les deux comptes (mandatsPartages/{id}), comme le reste des
-// dossiers. Migration ponctuelle et sans risque : au premier chargement de
-// chaque compte, ses anciens mandats (mandats/{uid}) sont recopiés vers
-// l'emplacement partagé s'ils n'y sont pas déjà.
+// Les mandats étaient auparavant stockés par compte (mandats/{uid}/{id}),
+// donc invisibles d'un compte à l'autre. On les rend partagés en les
+// stockant directement à plat (mandats/{id}) — même chemin Firebase
+// qu'avant (déjà autorisé par les règles de sécurité), juste sans le niveau
+// "par compte". Migration ponctuelle et sans risque au premier chargement de
+// chaque compte : ses anciens mandats (mandats/{uid}/{id}) sont recopiés à
+// plat s'ils n'y sont pas déjà, puis l'ancien sous-nœud "par compte" est
+// supprimé (les mandats eux-mêmes restent intacts, désormais à plat).
+// Un mandat a toujours un id commençant par "mand_" (voir creerNouveauMandat)
+// — ce préfixe sert à ignorer sans risque un éventuel résidu non nettoyé de
+// l'ancien format (une clé Firebase uid ne commence jamais par "mand_").
 function chargerMandatsFirebase(){
   if(!fbdb)return;
   var uid = firebase.auth().currentUser&&firebase.auth().currentUser.uid;
@@ -4198,27 +4202,35 @@ function chargerMandatsFirebase(){
     fbdb.ref('mandats/'+uid).once('value').then(function(snap){
       var anciens=snap.val();
       if(!anciens)return;
-      Object.keys(anciens).forEach(function(id){
-        fbdb.ref('mandatsPartages/'+id).once('value').then(function(existSnap){
-          if(!existSnap.exists()) fbdb.ref('mandatsPartages/'+id).set(anciens[id]);
+      var writes=Object.keys(anciens).map(function(id){
+        return fbdb.ref('mandats/'+id).once('value').then(function(existSnap){
+          if(!existSnap.exists()) return fbdb.ref('mandats/'+id).set(anciens[id]);
         });
       });
+      Promise.all(writes).then(function(){
+        fbdb.ref('mandats/'+uid).remove().catch(function(){});
+      }).catch(function(){});
     }).catch(function(){});
   }
-  fbdb.ref('mandatsPartages').on('value',function(snap){
-    allMandats = snap.val()||{};
+  fbdb.ref('mandats').on('value',function(snap){
+    var data=snap.val()||{};
+    var propre={};
+    Object.keys(data).forEach(function(k){
+      if(k.indexOf('mand_')===0) propre[k]=data[k];
+    });
+    allMandats = propre;
     renderListeMandats();
   });
 }
 
 function sauverMandatFirebase(id){
   if(!fbdb||!id)return;
-  fbdb.ref('mandatsPartages/'+id).set(allMandats[id]);
+  fbdb.ref('mandats/'+id).set(allMandats[id]);
 }
 
 function supprimerMandatFirebase(id){
   if(!fbdb||!id)return;
-  fbdb.ref('mandatsPartages/'+id).remove();
+  fbdb.ref('mandats/'+id).remove();
 }
 
 // ── LISTE MANDATS ────────────────────────────────────────
