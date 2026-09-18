@@ -3316,29 +3316,33 @@ function mrpHandleDrop(e){
 
 function mrpHandleFiles(files){
   if(!_mrpCurrentRowId) return;
+  var targetRowId = _mrpCurrentRowId;
   Array.from(files).forEach(function(file){
     if(!file.type.startsWith('image/')) return;
     var reader = new FileReader();
     reader.onload = function(ev){
       compressImage(ev.target.result, 800, 0.65, function(compressed){
-        if(!rowPhotos[_mrpCurrentRowId]) rowPhotos[_mrpCurrentRowId]=[];
+        if(!rowPhotos[targetRowId]) rowPhotos[targetRowId]=[];
         // Filet anti-doublon : ignore silencieusement une photo strictement
         // identique déjà présente sur cette ligne (ex : double sélection
         // accidentelle du même fichier, ou nouvelle tentative après un
         // envoi qui avait en réalité déjà réussi).
-        if(rowPhotos[_mrpCurrentRowId].some(function(p){return p.src===compressed;}))return;
+        if(rowPhotos[targetRowId].some(function(p){return p.src===compressed;}))return;
         var photoId = Date.now() + "_" + Math.floor(Math.random()*100000);
         var photoLabel = file.name.replace(/\.[^.]+$/,'');
-        rowPhotos[_mrpCurrentRowId].push({
+        rowPhotos[targetRowId].push({
           id: photoId,
           src: compressed,
           label: photoLabel
         });
         mrpRenderGrid();
         syncRowPhotosToGallery();
+        // Rédaction automatique de la désignation si elle est encore vide
+        // (voir planifierGenerationDescription) — jamais si déjà renseignée.
+        planifierGenerationDescription(targetRowId);
         // Sauver dans Firebase (partagé entre tous les comptes) + IDB (cache local)
         if(currentDossierId){
-          var savePromise=fbSauverPhoto(currentDossierId, _mrpCurrentRowId, photoId, compressed, photoLabel);
+          var savePromise=fbSauverPhoto(currentDossierId, targetRowId, photoId, compressed, photoLabel);
           // Indicateur visuel
           (function(){
             var ind=document.getElementById('photo-save-ind');
@@ -3358,6 +3362,81 @@ function mrpHandleFiles(files){
   });
   // Reset input
   document.getElementById('mrp-file-input').value='';
+}
+
+// ── RÉDACTION AUTOMATIQUE DE LA DÉSIGNATION DEPUIS LES PHOTOS DE LA LIGNE ──
+// Dès qu'une photo est ajoutée à une ligne dont la désignation est encore
+// vide, l'IA rédige elle-même la description (dans le style habituel des
+// inventaires), à partir de la ou des photos déjà présentes sur cette ligne.
+// Jamais d'estimation ici : les estimations restent saisies à la main, SAUF
+// pour l'or, où le calcul automatique déjà en place (detecterGrammesEtCalculer)
+// se déclenche tout seul si la description généré mentionne un poids en or.
+// Un court délai regroupe plusieurs photos ajoutées coup sur coup en un seul
+// appel, pour rédiger à partir de toutes les photos plutôt que de la première.
+var _genDescTimers = {};
+var _genDescEnCours = {};
+function planifierGenerationDescription(rowId){
+  if(_genDescTimers[rowId]) clearTimeout(_genDescTimers[rowId]);
+  _genDescTimers[rowId] = setTimeout(function(){
+    delete _genDescTimers[rowId];
+    genererDescriptionSiVide(rowId);
+  }, 900);
+}
+function afficherIndicateurRedaction(msg, ok){
+  var ind=document.getElementById('ia-desc-ind');
+  if(!ind){ind=document.createElement('div');ind.id='ia-desc-ind';ind.style.cssText='position:fixed;bottom:60px;right:20px;background:#2a6a3a;color:#fff;padding:8px 14px;border-radius:8px;z-index:99999;font-size:12px;';document.body.appendChild(ind);}
+  ind.textContent=msg;
+  ind.style.background=ok===false?'#7a2e1a':'#2a6a3a';
+  ind.style.opacity='1';clearTimeout(ind._t);
+  ind._t=setTimeout(function(){ind.style.opacity='0';},2500);
+}
+async function genererDescriptionSiVide(rowId){
+  const r=rows.find(function(x){return x.id===rowId;});
+  if(!r||r.desig||r.memo)return;
+  if(_genDescEnCours[rowId])return;
+  const apiKey=getApiKey();
+  if(!apiKey)return; // pas de clé IA configurée : rédaction manuelle comme avant
+  const photos=rowPhotos[rowId]||[];
+  if(photos.length===0)return;
+  const dossierAuDepart=currentDossierId; // pour ne jamais appliquer le résultat au mauvais dossier si elle change de dossier entre-temps
+  _genDescEnCours[rowId]=true;
+  afficherIndicateurRedaction('Rédaction de la désignation…');
+  try{
+    const sys='Tu es un commissaire-priseur judiciaire expert. Décris précisément ce que tu vois sur la ou les photos (matière, style/époque, état de conservation, particularités visibles), dans le style concis et factuel d\'un procès-verbal d\'inventaire judiciaire français (ex : "Un lot comprenant...", "Une bague en or jaune..."). Si un poids en grammes est lisible sur la photo (ex : affichage d\'une balance) pour un bijou en or, indique-le explicitement dans la description au format "Poids brut : X gr". Réponds en JSON valide, rien d\'autre : {"designation":"description complète pour le PV"}';
+    const content=[];
+    photos.forEach(function(p){content.push({type:'image',source:{type:'base64',media_type:'image/jpeg',data:p.src.split(',')[1]}});});
+    content.push({type:'text',text:photos.length>1?'Ces '+photos.length+' photos montrent le même bien, pour un inventaire judiciaire.':'Décris ce bien pour un inventaire judiciaire.'});
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':apiKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:500,system:sys,messages:[{role:'user',content:content}]})});
+    const data=await resp.json();if(data.error)throw new Error(data.error.message);
+    const txt=data.content.map(function(c){return c.text||'';}).join('');
+    const parsed=JSON.parse(txt.replace(/```json|```/g,'').trim());
+    // On revérifie juste avant d'appliquer : elle a pu taper la désignation
+    // elle-même pendant que l'IA travaillait (on ne l'écrase jamais), ou
+    // changer de dossier (les id de ligne peuvent se répéter d'un dossier à
+    // l'autre — on n'applique donc rien si le dossier actif a changé).
+    if(currentDossierId!==dossierAuDepart)return;
+    const r2=rows.find(function(x){return x.id===rowId;});
+    if(r2&&!r2.desig&&parsed.designation){
+      appliquerDescriptionIA(rowId,parsed.designation);
+      afficherIndicateurRedaction('Désignation rédigée par l\'IA');
+    }
+  }catch(e){
+    console.warn('Génération description IA :',e);
+    afficherIndicateurRedaction('Échec de la rédaction automatique',false);
+  }finally{
+    delete _genDescEnCours[rowId];
+  }
+}
+function appliquerDescriptionIA(rowId,texte){
+  const r=rows.find(function(x){return x.id===rowId;});
+  if(!r)return;
+  r.desig=texte;
+  if(!r.memo){
+    const calc=detecterGrammesEtCalculer(texte);
+    if(calc&&!r.estimManuelle){r.bas=calc.bas;r.haut=calc.haut;}
+  }
+  renderRows();
+  updateTotals();
 }
 
 function mrpDeletePhoto(rowId, photoId){
