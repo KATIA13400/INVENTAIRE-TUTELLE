@@ -1705,11 +1705,14 @@ function detecterGrammesEtCalculer(desig, bas, haut){
   // "argent" est exclue, même si elle contient par ailleurs un poids en grammes.
   if(/\bargent\b/i.test(desig))return null;
   if(!/\bor\b/i.test(desig))return null;
-  // Détecte un poids en grammes dans la désignation (ex: "34,6 gr" ou "3.8 gr")
-  const regex = /(\d+[,\.]\d+|\d+)\s*gr/i;
+  // Détecte un poids en grammes dans la désignation. Tolère les variations
+  // d'écriture courantes (dictée vocale ou saisie manuelle) : espace autour
+  // de la virgule décimale ("17, 2"), et "g" comme "gr"/"grs"/"gramme(s)"
+  // (ex: "34,6 gr", "3.8 gr", "17, 2 g", "10 grammes").
+  const regex = /(\d+(?:\s*[,\.]\s*\d+)?)\s*(?:gr|grs|grammes?|g)\b/i;
   const match = desig.match(regex);
   if(match){
-    const poids = parseFloat(match[1].replace(',','.'));
+    const poids = parseFloat(match[1].replace(/\s+/g,'').replace(',','.'));
     if(!isNaN(poids) && poids > 0){
       const calcBas = Math.round(poids * prixOrBas);
       const calcHaut = Math.round(poids * prixOrHaut);
