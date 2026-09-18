@@ -286,7 +286,7 @@ function fbSauver(dossierId, dossier) {
     mentionBijoux: dossier.mentionBijoux || false,
     h: dossier.h || {},
     rows: (dossier.rows || []).map(function(r) {
-      return {id:r.id, desig:r.desig||'', lieu:r.lieu||'', bas:r.bas||'', haut:r.haut||'', memo:r.memo||false};
+      return {id:r.id, desig:r.desig||'', lieu:r.lieu||'', bas:r.bas||'', haut:r.haut||'', memo:r.memo||false, estimManuelle:!!r.estimManuelle};
     })
   };
   fbdb.ref('dossiers/' + dossierId).set(toSave)
@@ -1701,8 +1701,12 @@ let prixOrBas = 50;
 let prixOrHaut = 60;
 
 function detecterGrammesEtCalculer(desig, bas, haut){
+  // Uniquement pour l'or (jamais l'argent) : une désignation mentionnant
+  // "argent" est exclue, même si elle contient par ailleurs un poids en grammes.
+  if(/\bargent\b/i.test(desig))return null;
+  if(!/\bor\b/i.test(desig))return null;
   // Détecte un poids en grammes dans la désignation (ex: "34,6 gr" ou "3.8 gr")
-  const regex = /(\d+[,\.]\d+|\d+)\s*gr/i;
+  const regex = /(\d+[,\.]\d+|\d+)\s*gr/i;
   const match = desig.match(regex);
   if(match){
     const poids = parseFloat(match[1].replace(',','.'));
@@ -1792,6 +1796,13 @@ function removeRow(id){
   rows=rows.filter(r=>r.id!==id);
   renderRows();renderGallery();
 }
+// Une fois l'estimation basse/haute modifiée à la main (ex : pour tenir
+// compte de pierres ou d'un autre élément), le calcul automatique de l'or
+// ne doit plus jamais l'écraser, même si la désignation est modifiée ensuite.
+function marquerEstimationManuelle(id){
+  const r=rows.find(function(x){return x.id===id;});
+  if(r)r.estimManuelle=true;
+}
 function updateRow(id,field,value){
   const r=rows.find(r=>r.id===id);
   if(r){
@@ -1801,7 +1812,7 @@ function updateRow(id,field,value){
       const tbody=document.getElementById('inv-body');
       const trs=[...tbody.querySelectorAll('tr')];
       const idx=rows.findIndex(x=>x.id===id);
-      if(calc){
+      if(calc&&!r.estimManuelle){
         r.bas=calc.bas;r.haut=calc.haut;
         if(idx>=0&&trs[idx]){
           const ib=trs[idx].querySelector('input[data-f="bas"]');
@@ -1883,8 +1894,8 @@ function renderRows(){
     var calcOr=r.memo?null:detecterGrammesEtCalculer(r.desig||'');
     html+='<td style="vertical-align:top;padding-top:4px"><div style="display:flex;align-items:flex-start;gap:3px"><textarea data-f="desig" data-id="'+r.id+'" placeholder="Description…" style="flex:1;font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);resize:none;overflow:hidden;line-height:1.5;padding:2px 3px;border-radius:4px;outline:none;min-height:26px;display:block">'+esc(r.desig)+'</textarea><button class="btn-mic" data-id="'+r.id+'" onclick="toggleDictaphone(this,'+r.id+')" title="Dicter" style="flex-shrink:0;margin-top:2px;background:none;border:1px solid var(--border);border-radius:6px;padding:3px 5px;cursor:pointer;color:var(--text3);font-size:13px;line-height:1"><i class=\"ti ti-microphone\"></i></button></div><div class="or-badge" style="'+(calcOr?'':'display:none;')+'font-size:10px;margin-top:2px;padding:1px 6px;border-radius:8px;background:#fdf3d0;color:#8a6d1d;border:1px solid #e8cf7a;width:fit-content">'+badgeOrHtml(calcOr)+'</div></td>';
     html+='<td><input list="pieces-list" data-f="lieu" data-id="'+r.id+'" value="'+esc(r.lieu||'')+'" placeholder="Pièce…" style="font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);width:100%;padding:2px 3px;border-radius:4px;outline:none;"/></td>';
-    html+='<td><input type="text" inputmode="decimal" class="r" data-f="bas" data-id="'+r.id+'" value="'+(r.bas||'')+'" placeholder="0" '+dis+' oninput="updateTotals()" style="font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);width:100%;padding:2px 3px;border-radius:4px;outline:none;text-align:right;"/></td>';
-    html+='<td><input type="text" inputmode="decimal" class="r" data-f="haut" data-id="'+r.id+'" value="'+(r.haut||'')+'" placeholder="0" '+dis+' oninput="updateTotals()" style="font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);width:100%;padding:2px 3px;border-radius:4px;outline:none;text-align:right;"/></td>';
+    html+='<td><input type="text" inputmode="decimal" class="r" data-f="bas" data-id="'+r.id+'" value="'+(r.bas||'')+'" placeholder="0" '+dis+' oninput="marquerEstimationManuelle('+r.id+');updateTotals()" style="font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);width:100%;padding:2px 3px;border-radius:4px;outline:none;text-align:right;"/></td>';
+    html+='<td><input type="text" inputmode="decimal" class="r" data-f="haut" data-id="'+r.id+'" value="'+(r.haut||'')+'" placeholder="0" '+dis+' oninput="marquerEstimationManuelle('+r.id+');updateTotals()" style="font-family:inherit;font-size:12px;border:none;background:transparent;color:var(--text);width:100%;padding:2px 3px;border-radius:4px;outline:none;text-align:right;"/></td>';
     html+='<td style="text-align:center;white-space:nowrap"><input type="checkbox" data-f="memo" data-id="'+r.id+'" '+chk+'/></td>';
     var rpCount=(rowPhotos[r.id]||[]).length;
     var rpBadge=rpCount>0?'<span class="rp-count">'+rpCount+'</span>':'';
@@ -3054,7 +3065,7 @@ function ouvrirDossier(id){
   rowsToLoad.forEach(function(r){
     var newId = (r.id!=null && !isNaN(parseInt(r.id))) ? parseInt(r.id) : ++rowId;
     if(newId > rowId) rowId = newId;
-    var row={id:newId,desig:r.desig||'',lieu:r.lieu||'',bas:r.bas||'',haut:r.haut||'',memo:r.memo||false};
+    var row={id:newId,desig:r.desig||'',lieu:r.lieu||'',bas:r.bas||'',haut:r.haut||'',memo:r.memo||false,estimManuelle:!!r.estimManuelle};
     rows.push(row);
   });
   renderRows();  // Un seul appel pour toutes les lignes
@@ -3576,7 +3587,7 @@ function exporterTousDossiers(){
       dateMaj: d.dateMaj,
       h: d.h || {},
       rows: (d.rows || []).map(function(r){
-        return {id:r.id, desig:r.desig||'', lieu:r.lieu||'', bas:r.bas||'', haut:r.haut||'', memo:r.memo||false};
+        return {id:r.id, desig:r.desig||'', lieu:r.lieu||'', bas:r.bas||'', haut:r.haut||'', memo:r.memo||false, estimManuelle:!!r.estimManuelle};
       })
     };
   });
