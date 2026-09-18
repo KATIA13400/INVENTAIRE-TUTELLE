@@ -613,7 +613,6 @@ function updateDriveStatus(){
       <button class="btn terra" onclick="ouvrirModalNouveauDossier()"><i class="ti ti-plus" style="font-size:13px"></i> Nouvel inventaire</button>
       <button class="btn terra" onclick="ouvrirModalNouveauDossier(true)"><i class="ti ti-car" style="font-size:13px"></i> Nouvelle estimation véhicule</button>
       <button class="btn" onclick="toggleListeDossiers()" id="btn-toggle-liste"><i class="ti ti-list" style="font-size:13px"></i> Tous les dossiers</button>
-      <button class="btn" onclick="exporterDesignationsPourStyle()" title="Exporte uniquement les désignations des biens (aucune donnée personnelle : ni nom, ni adresse, ni numéro de dossier)"><i class="ti ti-download" style="font-size:13px"></i> Exporter mes descriptions (anonyme)</button>
     </div>
   </div>
   <div style="position:relative;max-width:380px;margin:0 0 12px 0">
@@ -3662,32 +3661,6 @@ async function _appliquerSuppressionDoublons(plan){
 
 
 <script>
-// ── EXPORT ANONYME DES DÉSIGNATIONS (pour affiner le style de l'IA) ──────
-// N'exporte QUE les désignations des biens (+ le lieu et le type de
-// dossier, à titre de contexte) : jamais le nom du protégé, son adresse,
-// le mandataire, le numéro de dossier ou toute autre donnée personnelle.
-function exporterDesignationsPourStyle(){
-  if(currentDossierId) sauverDossierEnCours();
-  var lignes=[];
-  Object.keys(allDossiers).forEach(function(id){
-    var d=allDossiers[id];
-    var type=d.estimVehicule?'estimation véhicule':(d.type||'inventaire');
-    (d.rows||[]).forEach(function(r){
-      if(!r.desig)return;
-      lignes.push({type:type,lieu:r.lieu||'',memo:!!r.memo,desig:r.desig});
-    });
-  });
-  var data={version:1,exportDate:new Date().toISOString(),nbDesignations:lignes.length,designations:lignes};
-  var json=JSON.stringify(data,null,2);
-  var blob=new Blob([json],{type:'application/json'});
-  var url=URL.createObjectURL(blob);
-  var a=document.createElement('a');
-  a.href=url;a.download='descriptions_style_'+new Date().toISOString().slice(0,10)+'.json';
-  document.body.appendChild(a);a.click();document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-  alert(lignes.length+' désignation(s) exportée(s), sans aucune donnée personnelle.');
-}
-
 // ── EXPORT TOUS LES DOSSIERS ─────────────────────────────────────────────
 function exporterTousDossiers(){
   // Sauvegarder d'abord le dossier en cours
