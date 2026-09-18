@@ -1714,8 +1714,9 @@ function detecterGrammesEtCalculer(desig, bas, haut){
   if(match){
     const poids = parseFloat(match[1].replace(/\s+/g,'').replace(',','.'));
     if(!isNaN(poids) && poids > 0){
-      const calcBas = Math.round(poids * prixOrBas);
-      const calcHaut = Math.round(poids * prixOrHaut);
+      // Arrondi à la dizaine inférieure (ex : 1032 € → 1030 €)
+      const calcBas = Math.floor(poids * prixOrBas / 10) * 10;
+      const calcHaut = Math.floor(poids * prixOrHaut / 10) * 10;
       return {bas: String(calcBas), haut: String(calcHaut), poids: poids};
     }
   }
